@@ -42,7 +42,7 @@ pub fn main() !void {
     const bg = RGB.init(30, 30, 30);
     const fg = RGB.init(0, 100, 100);
 
-    const layout = [3][4]Slot{
+    const layout = [4][4]Slot{
         .{
             .{ .slider = .{ .value = Value.passthrough(&params.timbre), .symbol = Symbol.sine_wave } },
             .{ .slider = .{ .value = Value.int(@TypeOf(params.class), &params.class), .symbol = Symbol.hexagon } },
@@ -61,9 +61,15 @@ pub fn main() !void {
             .{ .slider = .{ .value = Value.passthrough(&params.amp_env.s), .color = RGB.init(210, 100, 100) } },
             .{ .slider = .{ .value = Value.passthrough(&params.amp_env.r), .color = RGB.init(210, 100, 100) } },
         },
+        .{
+            .{ .slider = .{ .value = Value.int(@TypeOf(params.channel), &params.channel), .color = RGB.init(180, 100, 180) } },
+            .{ .slider = .{ .value = Value.boolean(&params.reset_phase), .color = RGB.init(180, 100, 180) } },
+            .empty,
+            .empty,
+        },
     };
 
-    try gui.run("name", 800, 600, bg, fg, layout);
+    try gui.run(name, 800, 600, bg, fg, layout);
 }
 
 fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int {
@@ -74,9 +80,9 @@ fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int
 
     for (0..nframes) |f| {
         while (iter.next(@intCast(f))) |msg| switch (msg) {
-            .note_on => |m| voices.noteOn(m.pitch, m.velocity),
-            .note_off => |m| voices.noteOff(m.pitch, m.velocity),
-            .pitch_wheel => |m| voices.pitchWheel(m.value),
+            .note_on => |m| if (m.channel == params_snapshot.channel) voices.noteOn(m.pitch, m.velocity, &params_snapshot),
+            .note_off => |m| if (m.channel == params_snapshot.channel) voices.noteOff(m.pitch, m.velocity, &params_snapshot),
+            .pitch_wheel => |m| if (m.channel == params_snapshot.channel) voices.pitchWheel(m.value, &params_snapshot),
             else => {},
         };
         ab[f] = voices.next(&params_snapshot, @floatFromInt(js.samplerate));

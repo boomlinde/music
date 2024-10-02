@@ -12,6 +12,8 @@ pub const Params = struct {
     mod_env: Adsr.Params = .{},
     mod_ratio: f32 = 0.5,
     vel_ratio: f32 = 0.5,
+    channel: u4 = 0,
+    reset_phase: bool = true,
 
     pub usingnamespace @import("snapshotter.zig").Snapshotter(@This());
 };
@@ -63,19 +65,21 @@ pub inline fn next(self: *PdVoice, params: *const Params, srate: f32) f32 {
     return pd.wave(self.phase) * 0.5 * self.amp_env.next(&params.amp_env, self.gate, srate) * self.velocity * self.velocity;
 }
 
-pub fn noteOn(self: *PdVoice, pitch: u7, velocity: u7) void {
+pub fn noteOn(self: *PdVoice, pitch: u7, velocity: u7, params: *const Params) void {
     self.pitch = @floatFromInt(pitch);
     self.velocity = @as(f32, @floatFromInt(velocity)) / 127;
     self.gate = true;
-    self.phase = 0;
+    if (params.reset_phase) self.phase = 0;
 }
 
-pub fn noteOff(self: *PdVoice, velocity: u7) void {
+pub fn noteOff(self: *PdVoice, velocity: u7, params: *const Params) void {
+    _ = params;
     _ = velocity;
     self.gate = false;
 }
 
-pub fn pitchWheel(self: *PdVoice, value: u14) void {
+pub fn pitchWheel(self: *PdVoice, value: u14, params: *const Params) void {
+    _ = params;
     self.wheel = 2 * (@as(f32, @floatFromInt(value)) - 8192) / 8192;
 }
 

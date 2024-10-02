@@ -392,6 +392,26 @@ pub const Value = struct {
         };
     }
 
+    pub fn boolean(vp: *bool) Value {
+        const wrap = struct {
+            fn setter(value: f32, arg: *anyopaque) void {
+                const ip: *bool = @ptrCast(@alignCast(arg));
+                @atomicStore(bool, ip, value >= 0.5, .seq_cst);
+            }
+
+            fn getter(arg: *anyopaque) f32 {
+                const ip: *bool = @ptrCast(@alignCast(arg));
+                const fval: f32 = if (@atomicLoad(bool, ip, .seq_cst)) 1 else 0;
+                return fval;
+            }
+        };
+        return .{
+            .setter = wrap.setter,
+            .getter = wrap.getter,
+            .arg = @ptrCast(vp),
+        };
+    }
+
     pub fn passthrough(vp: *f32) Value {
         const wrap = struct {
             fn setter(value: f32, arg: *anyopaque) void {

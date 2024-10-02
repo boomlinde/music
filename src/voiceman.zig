@@ -38,30 +38,30 @@ pub fn RoundRobinManager(
             for (&self.links) |*link| self.free.pushBack(link);
         }
 
-        pub fn noteOn(self: *@This(), pitch: u7, velocity: u7) void {
+        pub fn noteOn(self: *@This(), pitch: u7, velocity: u7, params: *const Voice.Params) void {
             // According to MIDI, a note-on with a velocity of 0
             // represents releasing the key, so we'lll deal with this
             // as a note-off with medium velocity.
-            if (velocity == 0) return self.noteOff(pitch, 64);
+            if (velocity == 0) return self.noteOff(pitch, 64, params);
             if (self.isPlaying(pitch)) return;
 
             const ref = self.allocateVoice();
             self.keys[pitch] = ref;
-            ref.wrapper.voice.noteOn(pitch, velocity);
+            ref.wrapper.voice.noteOn(pitch, velocity, params);
         }
 
-        pub fn noteOff(self: *@This(), pitch: u7, velocity: u7) void {
+        pub fn noteOff(self: *@This(), pitch: u7, velocity: u7, params: *const Voice.Params) void {
             defer self.keys[pitch] = null;
 
             if (self.keys[pitch]) |ref| if (ref.get()) |wrapper| {
-                wrapper.voice.noteOff(velocity);
+                wrapper.voice.noteOff(velocity, params);
                 self.used.unlink(wrapper.link());
                 self.free.pushBack(wrapper.link());
             };
         }
 
-        pub fn pitchWheel(self: *@This(), value: u14) void {
-            for (&self.links) |*l| l.value.voice.pitchWheel(value);
+        pub fn pitchWheel(self: *@This(), value: u14, params: *const Voice.Params) void {
+            for (&self.links) |*l| l.value.voice.pitchWheel(value, params);
         }
 
         pub inline fn next(self: *@This(), params: *const Voice.Params, srate: f32) f32 {
