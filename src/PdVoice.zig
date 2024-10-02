@@ -1,12 +1,13 @@
 const std = @import("std");
 const Adsr = @import("Adsr.zig");
+const LinearAdsr = @import("LinearAdsr.zig");
 const Smoother = @import("Smoother.zig");
 
 const PdVoice = @This();
 
 pub const Params = struct {
     timbre: f32 = 0,
-    class: u2 = 0,
+    class: u3 = 0,
     amp_env: Adsr.Params = .{},
     mod_env: Adsr.Params = .{},
     mod_ratio: f32 = 0.5,
@@ -26,8 +27,14 @@ amp_env: Adsr = Adsr.init(),
 mod_env: Adsr = Adsr.init(),
 gate: bool = false,
 
-inline fn logize(a: f32) f32 {
-    return 1 - (1 - a) * (1 - a);
+inline fn logize3(a: f32) f32 {
+    const m = 1 - a;
+    return 1 - m * m * m;
+}
+
+inline fn logize2(a: f32) f32 {
+    const m = 1 - a;
+    return 1 - m * m;
 }
 
 pub inline fn next(self: *PdVoice, params: *const Params, srate: f32) f32 {
@@ -43,10 +50,14 @@ pub inline fn next(self: *PdVoice, params: *const Params, srate: f32) f32 {
 
     var pd: Pd = undefined;
     switch (params.class) {
-        0 => pd = .{ .x = (1 - logize(timbre)), .y = 1, .p = 1, .n = 1 }, // Square
-        1 => pd = .{ .x = 0.5 - (0.5 * logize(timbre)), .y = 0.5, .p = 1, .n = 0 }, // Saw
-        2 => pd = .{ .x = 0.95 * logize(timbre), .y = 0, .p = 0, .n = 0 }, // Pulse
-        3 => pd = .{ .x = 0.9 - logize(timbre) * 0.9, .y = 0.9, .p = 1, .n = 3 }, // Fat
+        0 => pd = .{ .x = (1 - logize3(timbre)), .y = 1, .p = 1, .n = 1 }, // Square
+        1 => pd = .{ .x = 0.5 - (0.5 * logize3(timbre)), .y = 0.5, .p = 1, .n = 0 }, // Saw
+        2 => pd = .{ .x = 0.95 * logize2(timbre), .y = 0, .p = 0, .n = 0 }, // Pulse
+        3 => pd = .{ .x = 0.95 * logize2(timbre), .y = 0, .p = 0, .n = 0, .q = 2 }, // Pulse2
+        4 => pd = .{ .x = 0.9 - logize3(timbre) * 0.9, .y = 0.9, .p = 1, .n = 5 }, // Fat
+        5 => pd = .{ .x = 0.5 - (0.48 * logize3(timbre)), .y = 0.5, .p = 0, .n = 2 }, // Buzz
+        6 => pd = .{ .x = (1 - logize3(timbre)), .y = 1, .p = 0.25, .n = 1 }, // Res
+        7 => pd = .{ .x = 0.25 + 0.7 * logize2(timbre), .y = 0.25, .p = 0, .n = 0, .q = 2 }, // ResSaw
     }
 
     return pd.wave(self.phase) * 0.5 * self.amp_env.next(&params.amp_env, self.gate, srate) * self.velocity * self.velocity;
@@ -71,15 +82,16 @@ pub fn pitchWheel(self: *PdVoice, value: u14) void {
 pub const Pd = struct {
     x: f32 = 0.5,
     y: f32 = 0.5,
-    n: u2 = 0,
+    n: f32 = 0,
     p: f32 = 0,
+    q: f32 = 1,
 
     fn wave(self: Pd, ph: f32) f32 {
-        return @sin((self.p * 0.25 + self.phase(ph)) * std.math.tau);
+        return @sin((self.p * 0.25 + self.phase(ph)) * std.math.tau * self.q);
     }
 
     inline fn phase(self: Pd, ph: f32) f32 {
-        const n = @as(f32, @floatFromInt(self.n)) + 1;
+        const n = self.n + 1;
         return @mod(self.singlePhase(ph * n) / n, n);
     }
 
