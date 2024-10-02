@@ -23,8 +23,8 @@ phase: f32 = 0,
 pitch: f32 = 0,
 wheel: f32 = 0,
 velocity: f32 = 0,
-amp_env: Adsr = Adsr.init(),
-mod_env: Adsr = Adsr.init(),
+amp_env: Adsr = Adsr.init(0.3),
+mod_env: Adsr = Adsr.init(0.1),
 gate: bool = false,
 
 inline fn logize3(a: f32) f32 {

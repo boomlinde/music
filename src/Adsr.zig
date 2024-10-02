@@ -30,13 +30,13 @@ attack_base: f32 = 0,
 decay_base: f32 = 0,
 release_base: f32 = 0,
 
-pub fn init() Adsr {
+pub fn init(ashape: f32) Adsr {
     var adsr = Adsr{};
     adsr.setAttackRate(0);
     adsr.setDecayRate(0);
     adsr.setReleaseRate(0);
     adsr.setSustainLevel(1);
-    adsr.setTargetRatioA(0.3);
+    adsr.setTargetRatioA(ashape);
     adsr.setTargetRatioDR(0.0001);
 
     return adsr;
