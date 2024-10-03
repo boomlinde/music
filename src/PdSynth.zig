@@ -40,7 +40,9 @@ pub fn handleMidiEvent(self: *PdSynth, event: midi.Message) void {
                 .note_off => |m| self.voices[m.handle].noteOff(),
             };
         },
-        .pitch_wheel => |m| self.shared.wheel = 2 * (@as(f32, @floatFromInt(m.value)) - 8192) / 8192,
+        .pitch_wheel => |m| if (m.channel == self.params.channel) {
+            self.shared.wheel = 2 * (@as(f32, @floatFromInt(m.value)) - 8192) / 8192;
+        },
         else => {},
     }
 }
