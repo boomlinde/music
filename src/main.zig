@@ -1,10 +1,10 @@
 const std = @import("std");
 const gui = @import("gui.zig");
 const midi = @import("midi.zig");
+
 const JackState = @import("JackState.zig");
 const PdVoice = @import("PdVoice.zig");
-const List = @import("list.zig").List;
-const voiceman = @import("voiceman.zig");
+const PdSynth = @import("PdSynth.zig");
 
 const RGB = gui.RGB;
 const Slot = gui.Slot;
@@ -15,19 +15,14 @@ var midiport: *JackState.Port = undefined;
 var audioport: *JackState.Port = undefined;
 var in = midi.In{};
 
-const nvoices = 8;
-
 var params = PdVoice.Params{};
 
-const VoiceMan = voiceman.RoundRobinManager(PdVoice, 8);
-var voices = VoiceMan{
-    .links = [_]List(VoiceMan.Gen).Link{.{ .value = .{ .voice = .{} } }} ** 8,
-};
+var synth: PdSynth = .{};
 
 pub fn main() !void {
     const name = "jack gui";
 
-    voices.reset();
+    synth.init();
 
     var js = try JackState.init(name, cb, undefined);
     defer js.deinit();
@@ -76,16 +71,11 @@ fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int
     const js: *JackState = @ptrCast(@alignCast(jstate_opaque));
     var iter = JackState.iterMidi(midiport, nframes, &in) catch return 1;
     var ab = JackState.audioBuf(audioport, nframes) catch return 1;
-    const params_snapshot = params.snapshot();
 
+    synth.updateParams(&params);
     for (0..nframes) |f| {
-        while (iter.next(@intCast(f))) |msg| switch (msg) {
-            .note_on => |m| if (m.channel == params_snapshot.channel) voices.noteOn(m.pitch, m.velocity, &params_snapshot),
-            .note_off => |m| if (m.channel == params_snapshot.channel) voices.noteOff(m.pitch, m.velocity, &params_snapshot),
-            .pitch_wheel => |m| if (m.channel == params_snapshot.channel) voices.pitchWheel(m.value, &params_snapshot),
-            else => {},
-        };
-        ab[f] = voices.next(&params_snapshot, @floatFromInt(js.samplerate));
+        while (iter.next(@intCast(f))) |msg| synth.handleMidiEvent(msg);
+        ab[f] = synth.next(@floatFromInt(js.samplerate));
     }
 
     return 0;

@@ -18,16 +18,21 @@ pub const Params = struct {
     pub usingnamespace @import("snapshotter.zig").Snapshotter(@This());
 };
 
-timbre_smoother: Smoother = .{ .time = 0.01 },
-mod_ratio_smoother: Smoother = .{ .time = 0.01 },
-vel_ratio_smoother: Smoother = .{ .time = 0.01 },
+pub const Shared = struct {
+    smooth_timbre: f32 = 0,
+    smooth_mod_ratio: f32 = 0,
+    smooth_vel_ratio: f32 = 0,
+    wheel: f32 = 0,
+};
+
 phase: f32 = 0,
 pitch: f32 = 0,
-wheel: f32 = 0,
 velocity: f32 = 0,
 amp_env: Adsr = Adsr.init(0.3),
 mod_env: Adsr = Adsr.init(0.1),
 gate: bool = false,
+params: *Params = undefined,
+shared: *Shared = undefined,
 
 inline fn logize3(a: f32) f32 {
     const m = 1 - a;
@@ -39,19 +44,19 @@ inline fn logize2(a: f32) f32 {
     return 1 - m * m;
 }
 
-pub inline fn next(self: *PdVoice, params: *const Params, srate: f32) f32 {
-    const freq = 440.0 * std.math.pow(f32, 2.0, (self.pitch + self.wheel - 69) / 12.0);
+pub inline fn next(self: *PdVoice, srate: f32) f32 {
+    const freq = 440.0 * std.math.pow(f32, 2.0, (self.pitch + self.shared.wheel - 69) / 12.0);
     defer self.phase = @mod(self.phase + freq / srate, 1);
 
-    const mod_ratio = self.mod_ratio_smoother.next(params.mod_ratio, srate);
-    const vel_ratio = self.vel_ratio_smoother.next(params.vel_ratio, srate);
+    const mod_ratio = self.shared.smooth_mod_ratio;
+    const vel_ratio = self.shared.smooth_vel_ratio;
 
-    const mod = (1 - mod_ratio) + self.mod_env.next(&params.mod_env, self.gate, srate) * mod_ratio;
+    const mod = (1 - mod_ratio) + self.mod_env.next(&self.params.mod_env, self.gate, srate) * mod_ratio;
     const vel = (1 - vel_ratio) + self.velocity * self.velocity * vel_ratio;
-    const timbre = self.timbre_smoother.next(params.timbre, srate) * mod * vel;
+    const timbre = self.shared.smooth_timbre * mod * vel;
 
     var pd: Pd = undefined;
-    switch (params.class) {
+    switch (self.params.class) {
         0 => pd = .{ .x = (1 - logize3(timbre)), .y = 1, .p = 1, .n = 1 }, // Square
         1 => pd = .{ .x = 0.5 - (0.5 * logize3(timbre)), .y = 0.5, .p = 1, .n = 0 }, // Saw
         2 => pd = .{ .x = 0.95 * logize2(timbre), .y = 0, .p = 0, .n = 0 }, // Pulse
@@ -62,25 +67,18 @@ pub inline fn next(self: *PdVoice, params: *const Params, srate: f32) f32 {
         7 => pd = .{ .x = 0.25 + 0.7 * logize2(timbre), .y = 0.25, .p = 0, .n = 0, .q = 2 }, // ResSaw
     }
 
-    return pd.wave(self.phase) * 0.5 * self.amp_env.next(&params.amp_env, self.gate, srate) * self.velocity * self.velocity;
+    return pd.wave(self.phase) * 0.5 * self.amp_env.next(&self.params.amp_env, self.gate, srate) * self.velocity * self.velocity;
 }
 
-pub fn noteOn(self: *PdVoice, pitch: u7, velocity: u7, params: *const Params) void {
+pub fn noteOn(self: *PdVoice, pitch: u7, velocity: u7) void {
     self.pitch = @floatFromInt(pitch);
     self.velocity = @as(f32, @floatFromInt(velocity)) / 127;
     self.gate = true;
-    if (params.reset_phase) self.phase = 0;
+    if (self.params.reset_phase) self.phase = 0;
 }
 
-pub fn noteOff(self: *PdVoice, velocity: u7, params: *const Params) void {
-    _ = params;
-    _ = velocity;
+pub fn noteOff(self: *PdVoice) void {
     self.gate = false;
-}
-
-pub fn pitchWheel(self: *PdVoice, value: u14, params: *const Params) void {
-    _ = params;
-    self.wheel = 2 * (@as(f32, @floatFromInt(value)) - 8192) / 8192;
 }
 
 pub const Pd = struct {
