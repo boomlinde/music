@@ -13,9 +13,9 @@ man: RoundRobinManager = .{},
 params: PdVoice.Params = .{},
 shared: PdVoice.Shared = .{},
 
-timbre_smoother: Smoother = .{ .time = 0.01 },
-mod_ratio_smoother: Smoother = .{ .time = 0.01 },
-vel_ratio_smoother: Smoother = .{ .time = 0.01 },
+timbre_smoother: Smoother = .{ .time = 0.1 },
+mod_ratio_smoother: Smoother = .{ .time = 0.1 },
+vel_ratio_smoother: Smoother = .{ .time = 0.1 },
 
 pub fn init(self: *PdSynth) void {
     for (0..nvoices) |i| {
@@ -31,16 +31,14 @@ pub fn updateParams(self: *PdSynth, new_params: *const PdVoice.Params) void {
     self.params = new_params.snapshot();
 }
 
-pub fn handleMidiEvent(self: *PdSynth, event: midi.Message) void {
+pub fn handleMidiEvent(self: *PdSynth, event: midi.Event) void {
+    if ((event.channel() orelse return) != self.params.channel) return;
     switch (event) {
-        inline .note_on, .note_off => |v| {
-            if (v.channel != self.params.channel) return;
-            if (self.man.handleEvent(event)) |ev| switch (ev) {
-                .note_on => |m| self.voices[m.handle].noteOn(m.pitch, m.velocity),
-                .note_off => |m| self.voices[m.handle].noteOff(),
-            };
+        inline .note_on, .note_off => if (self.man.handleEvent(event)) |ev| switch (ev) {
+            .note_on => |m| self.voices[m.handle].noteOn(m.pitch, m.velocity),
+            .note_off => |m| self.voices[m.handle].noteOff(),
         },
-        .pitch_wheel => |m| if (m.channel == self.params.channel) {
+        .pitch_wheel => |m| {
             self.shared.wheel = 2 * (@as(f32, @floatFromInt(m.value)) - 8192) / 8192;
         },
         else => {},

@@ -104,7 +104,7 @@ pub const MidiIterator = struct {
     idx: NFrames = 0,
     next_event: ?c.jack_midi_event_t = null,
 
-    pub fn next(self: *MidiIterator, time: NFrames) ?midi.Message {
+    pub fn next(self: *MidiIterator, time: NFrames) ?midi.Event {
         if (self.next_event == null and self.idx < self.count) {
             var ev: c.jack_midi_event_t = undefined;
             if (0 != c.jack_midi_event_get(&ev, self.buffer, self.idx))

@@ -4,10 +4,10 @@ pub const In = struct {
     buflen: usize = 0,
     sysex: bool = false,
 
-    pub fn consume(self: *In, packet: u8) ?Message {
+    pub fn consume(self: *In, packet: u8) ?Event {
         // Realtime messages
         if (packet >= 0xf8) {
-            return Message.decode(packet, self.buf[0..self.buflen]);
+            return Event.decode(packet, self.buf[0..self.buflen]);
         }
 
         // SysEx
@@ -29,7 +29,7 @@ pub const In = struct {
             self.status = packet;
             self.sysex = false;
             defer self.buflen = 0;
-            return Message.decode(packet, self.buf[0..self.buflen]);
+            return Event.decode(packet, self.buf[0..self.buflen]);
         }
 
         if (self.sysex) return .{ .sysex_data = @intCast(packet) };
@@ -39,7 +39,7 @@ pub const In = struct {
             self.buflen += 1;
         }
 
-        if (Message.decode(self.status, self.buf[0..self.buflen])) |m| {
+        if (Event.decode(self.status, self.buf[0..self.buflen])) |m| {
             self.buflen = 0;
             // Drop the status if it's a system common message
             if (self.status >= 0xf0) self.status = 0;
@@ -54,8 +54,18 @@ pub const In = struct {
     }
 };
 
-pub const Message = union(enum) {
-    fn decode(status: u8, data: []u7) ?Message {
+pub const Event = union(enum) {
+    pub fn channel(self: Event) ?u4 {
+        switch (self) {
+            inline else => |v| {
+                if (@typeInfo(@TypeOf(v)) != .@"struct") return null;
+                if (@hasField(@TypeOf(v), "channel")) return v.channel;
+            },
+        }
+        return null;
+    }
+
+    fn decode(status: u8, data: []u7) ?Event {
         return switch (status & 0xf0) {
             0x80 => NoteOff.decode(status, data),
             0x90 => NoteOn.decode(status, data),
@@ -95,104 +105,104 @@ pub const Message = union(enum) {
         channel: u4,
         pitch: u7,
         velocity: u7,
-        pub usingnamespace Msg(@This(), 0x80);
+        pub usingnamespace Encodable(@This(), 0x80);
     };
 
     pub const NoteOn = struct {
         channel: u4,
         pitch: u7,
         velocity: u7,
-        pub usingnamespace Msg(@This(), 0x90);
+        pub usingnamespace Encodable(@This(), 0x90);
     };
 
     pub const PolyphonicAftertouch = struct {
         channel: u4,
         pitch: u7,
         pressure: u7,
-        pub usingnamespace Msg(@This(), 0xa0);
+        pub usingnamespace Encodable(@This(), 0xa0);
     };
 
     pub const ControlChange = struct {
         channel: u4,
         controller: u7,
         value: u7,
-        pub usingnamespace Msg(@This(), 0xb0);
+        pub usingnamespace Encodable(@This(), 0xb0);
     };
 
     pub const ProgramChange = struct {
         channel: u4,
         program: u7,
-        pub usingnamespace Msg(@This(), 0xc0);
+        pub usingnamespace Encodable(@This(), 0xc0);
     };
 
     pub const ChannelAftertouch = struct {
         channel: u4,
         pressure: u7,
-        pub usingnamespace Msg(@This(), 0xd0);
+        pub usingnamespace Encodable(@This(), 0xd0);
     };
 
     pub const PitchWheel = struct {
         channel: u4,
         value: u14,
-        pub usingnamespace Msg(@This(), 0xe0);
+        pub usingnamespace Encodable(@This(), 0xe0);
     };
 
     pub const SongSelect = struct {
         song: u7,
-        pub usingnamespace Msg(@This(), 0xf3);
+        pub usingnamespace Encodable(@This(), 0xf3);
     };
 
     pub const SongPointer = struct {
         value: u14,
-        pub usingnamespace Msg(@This(), 0xf2);
+        pub usingnamespace Encodable(@This(), 0xf2);
     };
 
     pub const QuarterFrame = struct {
         value: u7,
-        pub usingnamespace Msg(@This(), 0xf1);
+        pub usingnamespace Encodable(@This(), 0xf1);
     };
 
     pub const SysexBegin = struct {
-        pub usingnamespace Msg(@This(), 0xf0);
+        pub usingnamespace Encodable(@This(), 0xf0);
     };
 
     pub const SysexEnd = struct {
-        pub usingnamespace Msg(@This(), 0xf7);
+        pub usingnamespace Encodable(@This(), 0xf7);
     };
 
     pub const TuneRequest = struct {
-        pub usingnamespace Msg(@This(), 0xf6);
+        pub usingnamespace Encodable(@This(), 0xf6);
     };
 
     pub const TimingClock = struct {
-        pub usingnamespace Msg(@This(), 0xf8);
+        pub usingnamespace Encodable(@This(), 0xf8);
     };
 
     pub const MeasureEnd = struct {
-        pub usingnamespace Msg(@This(), 0xf9);
+        pub usingnamespace Encodable(@This(), 0xf9);
     };
 
     pub const Start = struct {
-        pub usingnamespace Msg(@This(), 0xfa);
+        pub usingnamespace Encodable(@This(), 0xfa);
     };
 
     pub const Continue = struct {
-        pub usingnamespace Msg(@This(), 0xfb);
+        pub usingnamespace Encodable(@This(), 0xfb);
     };
 
     pub const Stop = struct {
-        pub usingnamespace Msg(@This(), 0xfc);
+        pub usingnamespace Encodable(@This(), 0xfc);
     };
 
     pub const ActiveSensing = struct {
-        pub usingnamespace Msg(@This(), 0xfe);
+        pub usingnamespace Encodable(@This(), 0xfe);
     };
 
     pub const Reset = struct {
-        pub usingnamespace Msg(@This(), 0xff);
+        pub usingnamespace Encodable(@This(), 0xff);
     };
 
-    fn Msg(comptime T: type, comptime statusMask: u8) type {
+    fn Encodable(comptime T: type, comptime statusMask: u8) type {
         const std = @import("std");
         const len = lenblk: {
             var l: usize = 0;
@@ -208,7 +218,7 @@ pub const Message = union(enum) {
             break :lenblk l;
         };
         return struct {
-            inline fn decode(status: u8, data: []u7) ?Message {
+            inline fn decode(status: u8, data: []u7) ?Event {
                 if (data.len < len) return null;
                 var v: T = undefined;
                 if (@hasField(T, "channel"))
@@ -230,11 +240,11 @@ pub const Message = union(enum) {
                     }
                 }
 
-                inline for (std.meta.fields(Message)) |field| {
-                    if (field.type == T) return @unionInit(Message, field.name, v);
+                inline for (std.meta.fields(Event)) |field| {
+                    if (field.type == T) return @unionInit(Event, field.name, v);
                 }
 
-                @compileError("not a Message field");
+                @compileError("not a Event field");
             }
 
             pub fn encode(self: T, buf: *EncodingBuf) ![]u8 {
@@ -300,7 +310,7 @@ test In {
     var in = In{};
     var idx: usize = 0;
 
-    const expected = [_]Message{
+    const expected = [_]Event{
         .timing_clock,
         .{ .note_on = .{ .channel = 3, .pitch = 0x12, .velocity = 0x34 } },
         .timing_clock,

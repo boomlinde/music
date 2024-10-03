@@ -1,6 +1,5 @@
 const std = @import("std");
 const Adsr = @import("Adsr.zig");
-const LinearAdsr = @import("LinearAdsr.zig");
 const Smoother = @import("Smoother.zig");
 
 const PdVoice = @This();

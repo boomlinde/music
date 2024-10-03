@@ -48,7 +48,7 @@ pub fn reset(self: *RoundRobinManager) void {
     for (&self.keys) |*key| key.* = null;
 }
 
-pub fn handleEvent(self: *RoundRobinManager, msg: midi.Message) ?VoiceEvent {
+pub fn handleEvent(self: *RoundRobinManager, msg: midi.Event) ?VoiceEvent {
     return switch (msg) {
         .note_on => |d| self.noteOn(d.pitch, d.velocity),
         .note_off => |d| self.noteOff(d.pitch, d.velocity),
