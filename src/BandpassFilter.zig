@@ -26,3 +26,7 @@ pub fn next(self: *@This(), in: f32, freq: f32, q: f32, srate: f32) f32 {
 
     return out * q;
 }
+
+pub fn reset(self: *@This()) void {
+    self.* = .{};
+}

@@ -73,6 +73,7 @@ const Voice = struct {
         self.amp_env.trigger();
         self.pitch_env.trigger();
         self.timbre_env.trigger();
+        self.mod.reset();
         self.phase = 0;
     }
 
