@@ -45,7 +45,7 @@ pub fn handleMidiEvent(self: *PdSynth, event: midi.Event) void {
     }
 }
 
-pub fn next(self: *PdSynth, srate: f32) f32 {
+pub inline fn next(self: *PdSynth, srate: f32) f32 {
     // Update shared smoothers
     self.shared.smooth_timbre = self.timbre_smoother.next(self.params.timbre, srate);
     self.shared.smooth_mod_ratio = self.mod_ratio_smoother.next(self.params.mod_ratio, srate);

@@ -87,7 +87,7 @@ pub const Pd = struct {
     p: f32 = 0,
     q: f32 = 1,
 
-    fn wave(self: Pd, ph: f32) f32 {
+    pub fn wave(self: Pd, ph: f32) f32 {
         return @sin((self.p * 0.25 + self.phase(ph)) * std.math.tau * self.q);
     }
 
