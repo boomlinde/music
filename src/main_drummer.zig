@@ -11,7 +11,13 @@ const Value = gui.Value;
 const Symbol = gui.Symbol;
 
 var midiport: *JackState.Port = undefined;
-var audioport: *JackState.Port = undefined;
+
+var sport: *JackState.Port = undefined;
+var port0: *JackState.Port = undefined;
+var port1: *JackState.Port = undefined;
+var port2: *JackState.Port = undefined;
+var port3: *JackState.Port = undefined;
+
 var in = midi.In{};
 
 var params = DrumSynth.Params{};
@@ -27,8 +33,21 @@ pub fn main() !void {
 
     midiport = try js.registerInput("midi", JackState.DefaultMidiType);
     defer js.unregisterPort(midiport);
-    audioport = try js.registerOutput("out", JackState.DefaultAudioType);
-    defer js.unregisterPort(audioport);
+
+    sport = try js.registerOutput("sum", JackState.DefaultAudioType);
+    defer js.unregisterPort(sport);
+
+    port0 = try js.registerOutput("0", JackState.DefaultAudioType);
+    defer js.unregisterPort(port0);
+
+    port1 = try js.registerOutput("1", JackState.DefaultAudioType);
+    defer js.unregisterPort(port1);
+
+    port2 = try js.registerOutput("2", JackState.DefaultAudioType);
+    defer js.unregisterPort(port2);
+
+    port3 = try js.registerOutput("3", JackState.DefaultAudioType);
+    defer js.unregisterPort(port3);
 
     try js.activate();
 
@@ -272,11 +291,21 @@ fn flagIdx(comptime idx: usize) gui.Flag {
 fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int {
     const js: *JackState = @ptrCast(@alignCast(jstate_opaque));
     var iter = JackState.iterMidi(midiport, nframes, &in) catch return 1;
-    var ab = JackState.audioBuf(audioport, nframes) catch return 1;
+
+    var sport_buffer = JackState.audioBuf(sport, nframes) catch return 1;
+    var port0_buffer = JackState.audioBuf(port0, nframes) catch return 1;
+    var port1_buffer = JackState.audioBuf(port1, nframes) catch return 1;
+    var port2_buffer = JackState.audioBuf(port2, nframes) catch return 1;
+    var port3_buffer = JackState.audioBuf(port3, nframes) catch return 1;
 
     for (0..nframes) |f| {
         while (iter.next(@intCast(f))) |msg| synth.handleMidiEvent(msg, &params, &redraw);
-        ab[f] = synth.next(&params, @floatFromInt(js.samplerate));
+        const out = synth.next(&params, @floatFromInt(js.samplerate));
+        sport_buffer[f] = out.sum;
+        port0_buffer[f] = out.buses[0];
+        port1_buffer[f] = out.buses[1];
+        port2_buffer[f] = out.buses[2];
+        port3_buffer[f] = out.buses[3];
     }
 
     return 0;

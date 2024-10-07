@@ -18,12 +18,21 @@ pub const Params = struct {
     usingnamespace Accessor(@This());
 };
 
-pub inline fn next(self: *DrumSynth, params: *const Params, srate: f32) f32 {
-    var out: f32 = 0;
+pub const Out = struct {
+    buses: [4]f32 = undefined,
+    sum: f32 = 0,
+};
+
+pub inline fn next(self: *DrumSynth, params: *const Params, srate: f32) Out {
+    var out: Out = .{};
+
     for (&self.voices, 0..) |*voice, i| {
-        out += voice.next(&params.sets[self.indices[i]], srate);
+        const current = voice.next(&params.sets[self.indices[i]], srate);
+        out.buses[i] = current;
+        out.sum += current;
     }
-    return @min(1, @max(-1, out));
+    out.sum = @min(1, @max(-1, out.sum));
+    return out;
 }
 
 pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event, params: *const Params, redraw: *bool) void {
