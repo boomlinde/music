@@ -6,6 +6,7 @@ pub fn build(b: *std.Build) void {
 
     addExe(b, "pdsynth", "src/main_pdsynth.zig", target, optimize, true);
     addExe(b, "drummer", "src/main_drummer.zig", target, optimize, true);
+    addExe(b, "autoconnect", "src/main_autoconnect.zig", target, optimize, false);
 }
 
 fn addExe(
