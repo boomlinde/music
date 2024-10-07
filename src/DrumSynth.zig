@@ -8,13 +8,11 @@ const BandpassFilter = @import("BandpassFilter.zig");
 
 const DrumSynth = @This();
 
-const nparamsets = 7;
-
 voice: Voice = .{},
 paramset_idx: usize = 0,
 
 pub const Params = struct {
-    sets: [nparamsets]Voice.Params = [_]Voice.Params{.{}} ** nparamsets,
+    sets: [12]Voice.Params = [_]Voice.Params{.{}} ** 12,
 
     usingnamespace Accessor(@This());
 };
@@ -26,19 +24,7 @@ pub inline fn next(self: *DrumSynth, params: *const Params, srate: f32) f32 {
 pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event) void {
     switch (event) {
         .note_on => |v| {
-            const n = v.pitch % 12;
-            self.paramset_idx = switch (n) {
-                0 => 0,
-                2 => 1,
-                4 => 2,
-                5 => 3,
-                7 => 4,
-                9 => 5,
-                11 => 6,
-                else => {
-                    return;
-                },
-            };
+            self.paramset_idx = v.pitch % 12;
             self.voice.trigger();
         },
         else => {},
