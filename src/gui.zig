@@ -4,7 +4,7 @@ const c = @cImport({
     @cInclude("SDL.h");
 });
 
-pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, layout: anytype) !void {
+pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, redraw: *bool, layout: anytype) !void {
     const margin: f32 = 0.1;
 
     const rows = switch (@typeInfo(@TypeOf(layout))) {
@@ -105,13 +105,46 @@ pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, layout: 
                 s.symbol.draw(r, symbol_offset, symbol_scale);
                 _ = c.SDL_RenderSetClipRect(r, null);
             },
+            .flag => |flag| {
+                const raised = flag.call();
+                const raised_float: f32 = if (raised) 1 else 0;
+                if (!redraw_all and drawn[y][x] == raised_float) continue;
+                drawn[y][x] = raised_float;
+                const rect = Rect{
+                    .pos = w_ratio.mul(Vec2{
+                        .x = @floatFromInt(x),
+                        .y = @floatFromInt(y),
+                    }).add(w_ratio.div(3)),
+                    .dim = w_ratio.div(3),
+                };
+                const frame = Rect{
+                    .pos = rect.pos.sub(1),
+                    .dim = rect.dim.add(2),
+                };
+
+                flag.color.apply(r);
+                frame.fill(r);
+
+                if (raised)
+                    flag.color.apply(r)
+                else
+                    bg.apply(r);
+                rect.fill(r);
+            },
         };
         redraw_all = false;
 
         _ = c.SDL_RenderPresent(r);
 
         var ev: c.SDL_Event = undefined;
-        _ = c.SDL_WaitEvent(&ev);
+        while (c.SDL_PollEvent(&ev) == 0) {
+            if (@atomicLoad(bool, redraw, .seq_cst)) {
+                // Don't worry about TOCTOU here; we're redrawing either way
+                @atomicStore(bool, redraw, false, .seq_cst);
+                continue :mainloop;
+            }
+            c.SDL_Delay(1);
+        }
         while (true) {
             switch (ev.type) {
                 c.SDL_QUIT => break :mainloop,
@@ -163,6 +196,17 @@ pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, layout: 
 pub const Slot = union(enum) {
     empty,
     slider: Slider,
+    flag: Flag,
+};
+
+pub const Flag = struct {
+    raised: *const fn (arg: *anyopaque) bool,
+    arg: *anyopaque,
+    color: RGB,
+
+    fn call(self: Flag) bool {
+        return self.raised(self.arg);
+    }
 };
 
 pub const Slider = struct {

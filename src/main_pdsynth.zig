@@ -18,6 +18,7 @@ var in = midi.In{};
 var params = PdVoice.Params{};
 
 var synth: PdSynth = .{};
+var redraw = false;
 
 pub fn main() !void {
     const name = "jack gui";
@@ -64,7 +65,7 @@ pub fn main() !void {
         },
     };
 
-    try gui.run(name, 800, 600, bg, fg, layout);
+    try gui.run(name, 800, 600, bg, fg, &redraw, layout);
 }
 
 fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int {

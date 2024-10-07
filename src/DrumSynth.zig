@@ -10,6 +10,7 @@ const DrumSynth = @This();
 
 voices: [4]Voice = [_]Voice{.{}} ** 4,
 indices: [4]usize = [_]usize{0} ** 4,
+last_played: usize = 9999,
 
 pub const Params = struct {
     sets: [12]Voice.Params = [_]Voice.Params{.{}} ** 12,
@@ -25,7 +26,7 @@ pub inline fn next(self: *DrumSynth, params: *const Params, srate: f32) f32 {
     return @min(1, @max(-1, out));
 }
 
-pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event, params: *const Params) void {
+pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event, params: *const Params, redraw: *bool) void {
     switch (event) {
         .note_on => |v| {
             const idx = v.pitch % 12;
@@ -33,6 +34,8 @@ pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event, params: *const Param
             const bus = set.get(.bus);
             self.indices[bus] = idx;
             self.voices[bus].trigger();
+            @atomicStore(usize, &self.last_played, idx, .seq_cst);
+            @atomicStore(bool, redraw, true, .seq_cst);
         },
         else => {},
     }
@@ -47,6 +50,7 @@ const Voice = struct {
     mod: BandpassFilter = .{},
 
     const Params = struct {
+        level: f32 = 1,
         amp_env: DrumEnv.Params = .{},
         pitch_env: DrumEnv.Params = .{},
         timbre_env: DrumEnv.Params = .{},
@@ -72,6 +76,7 @@ const Voice = struct {
     }
 
     pub inline fn next(self: *Voice, params: *const Voice.Params, srate: f32) f32 {
+        if (self.amp_env.state == 0) return 0;
         const noise = self.noise.float();
         const ae = self.amp_env.next(&params.amp_env, srate);
         const pe = self.pitch_env.next(&params.pitch_env, srate);
@@ -95,7 +100,9 @@ const Voice = struct {
 
         const pd = Pd{ .x = (1 - logize3(timbre)), .y = 1, .p = 1, .n = 1 };
 
-        return pd.wave(self.phase + ml * ml * mod) * ae;
+        const level = params.get(.level);
+
+        return pd.wave(self.phase + ml * ml * mod) * ae * level * level;
     }
 };
 
