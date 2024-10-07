@@ -38,10 +38,12 @@ pub fn main() !void {
     const mod_color = RGB.init(150, 150, 30);
     const pitch_color = RGB.init(150, 70, 70);
     const timbre_color = RGB.init(100, 150, 150);
+    const bus_color = RGB.init(200, 50, 200);
 
     const p = Value.passthrough;
+    const b = Value.int;
 
-    const layout = [_][12]Slot{
+    const layout = [_][13]Slot{
         .{
             .{ .slider = .{ .value = p(&params.sets[0].amp_env.time), .color = amp_color } },
             .{ .slider = .{ .value = p(&params.sets[0].amp_env.shape), .color = amp_color } },
@@ -55,6 +57,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[0].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[0].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[0].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[0].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[1].amp_env.time), .color = amp_color } },
@@ -69,6 +72,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[1].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[1].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[1].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[1].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[2].amp_env.time), .color = amp_color } },
@@ -83,6 +87,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[2].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[2].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[2].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[2].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[3].amp_env.time), .color = amp_color } },
@@ -97,6 +102,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[3].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[3].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[3].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[3].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[4].amp_env.time), .color = amp_color } },
@@ -111,6 +117,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[4].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[4].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[4].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[4].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[5].amp_env.time), .color = amp_color } },
@@ -125,6 +132,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[5].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[5].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[5].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[5].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[6].amp_env.time), .color = amp_color } },
@@ -139,6 +147,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[6].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[6].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[6].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[6].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[7].amp_env.time), .color = amp_color } },
@@ -153,6 +162,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[7].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[7].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[7].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[7].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[8].amp_env.time), .color = amp_color } },
@@ -167,6 +177,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[8].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[8].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[8].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[8].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[9].amp_env.time), .color = amp_color } },
@@ -181,6 +192,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[9].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[9].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[9].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[9].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[10].amp_env.time), .color = amp_color } },
@@ -195,6 +207,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[10].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[10].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[10].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[10].bus), .color = bus_color } },
         },
         .{
             .{ .slider = .{ .value = p(&params.sets[11].amp_env.time), .color = amp_color } },
@@ -209,6 +222,7 @@ pub fn main() !void {
             .{ .slider = .{ .value = p(&params.sets[11].mod_pitch), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[11].mod_level), .color = mod_color } },
             .{ .slider = .{ .value = p(&params.sets[11].q), .color = mod_color } },
+            .{ .slider = .{ .value = b(u2, &params.sets[11].bus), .color = bus_color } },
         },
     };
 
@@ -221,7 +235,7 @@ fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int
     var ab = JackState.audioBuf(audioport, nframes) catch return 1;
 
     for (0..nframes) |f| {
-        while (iter.next(@intCast(f))) |msg| synth.handleMidiEvent(msg);
+        while (iter.next(@intCast(f))) |msg| synth.handleMidiEvent(msg, &params);
         ab[f] = synth.next(&params, @floatFromInt(js.samplerate));
     }
 

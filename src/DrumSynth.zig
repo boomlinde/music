@@ -8,8 +8,8 @@ const BandpassFilter = @import("BandpassFilter.zig");
 
 const DrumSynth = @This();
 
-voice: Voice = .{},
-paramset_idx: usize = 0,
+voices: [4]Voice = [_]Voice{.{}} ** 4,
+indices: [4]usize = [_]usize{0} ** 4,
 
 pub const Params = struct {
     sets: [12]Voice.Params = [_]Voice.Params{.{}} ** 12,
@@ -18,14 +18,21 @@ pub const Params = struct {
 };
 
 pub inline fn next(self: *DrumSynth, params: *const Params, srate: f32) f32 {
-    return self.voice.next(&params.sets[self.paramset_idx], srate);
+    var out: f32 = 0;
+    for (&self.voices, 0..) |*voice, i| {
+        out += voice.next(&params.sets[self.indices[i]], srate);
+    }
+    return @min(1, @max(-1, out));
 }
 
-pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event) void {
+pub fn handleMidiEvent(self: *DrumSynth, event: midi.Event, params: *const Params) void {
     switch (event) {
         .note_on => |v| {
-            self.paramset_idx = v.pitch % 12;
-            self.voice.trigger();
+            const idx = v.pitch % 12;
+            const set = &params.sets[idx];
+            const bus = set.get(.bus);
+            self.indices[bus] = idx;
+            self.voices[bus].trigger();
         },
         else => {},
     }
@@ -51,6 +58,7 @@ const Voice = struct {
         mod_level: f32 = 0,
         mod_pitch: f32 = 0.3,
         q: f32 = 0,
+        bus: u2 = 0,
 
         usingnamespace Accessor(@This());
     };
