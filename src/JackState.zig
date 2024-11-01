@@ -105,6 +105,13 @@ pub const MidiIterator = struct {
     next_event: ?c.jack_midi_event_t = null,
 
     pub fn next(self: *MidiIterator, time: NFrames) ?midi.Event {
+        if (self.nextRaw(time)) |bytes| for (bytes) |b| if (self.in.consume(b)) |message| {
+            return message;
+        };
+        return null;
+    }
+
+    pub fn nextRaw(self: *MidiIterator, time: NFrames) ?[]u8 {
         if (self.next_event == null and self.idx < self.count) {
             var ev: c.jack_midi_event_t = undefined;
             if (0 != c.jack_midi_event_get(&ev, self.buffer, self.idx))
@@ -117,12 +124,7 @@ pub const MidiIterator = struct {
         if (ev.time != time) return null;
 
         defer self.next_event = null;
-        for (0..ev.size) |i| {
-            if (self.in.consume(ev.buffer[i])) |message| {
-                return message;
-            }
-        }
-        return null;
+        return ev.buffer[0..ev.size];
     }
 };
 

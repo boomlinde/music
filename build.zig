@@ -4,9 +4,10 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    addExe(b, "pdsynth", "src/main_pdsynth.zig", target, optimize, true);
-    addExe(b, "drummer", "src/main_drummer.zig", target, optimize, true);
-    addExe(b, "autoconnect", "src/main_autoconnect.zig", target, optimize, false);
+    addExe(b, "pdsynth", "src/main_pdsynth.zig", target, optimize, &.{ "sdl2", "jack" });
+    addExe(b, "drummer", "src/main_drummer.zig", target, optimize, &.{ "sdl2", "jack" });
+    addExe(b, "autoconnect", "src/main_autoconnect.zig", target, optimize, &.{"jack"});
+    addExe(b, "jack-mt32", "src/main_mt32.zig", target, optimize, &.{ "jack", "mt32emu", "sdl2" });
 }
 
 fn addExe(
@@ -15,14 +16,14 @@ fn addExe(
     comptime src_path: []const u8,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    link_sdl: bool,
+    libs: []const []const u8,
 ) void {
     const exe = withLibs(b.addExecutable(.{
         .name = name,
         .root_source_file = b.path(src_path),
         .target = target,
         .optimize = optimize,
-    }), link_sdl);
+    }), libs);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -34,7 +35,7 @@ fn addExe(
         .root_source_file = b.path(src_path),
         .target = target,
         .optimize = optimize,
-    }), link_sdl);
+    }), libs);
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
     const test_step = b.step("test-" ++ name, "Run " ++ name ++ " unit tests");
@@ -43,9 +44,8 @@ fn addExe(
     if (b.args) |args| run_cmd.addArgs(args);
 }
 
-fn withLibs(step: *std.Build.Step.Compile, link_sdl: bool) *std.Build.Step.Compile {
-    if (link_sdl) step.linkSystemLibrary("sdl2");
-    step.linkSystemLibrary("jack");
+fn withLibs(step: *std.Build.Step.Compile, libs: []const []const u8) *std.Build.Step.Compile {
+    for (libs) |lib| step.linkSystemLibrary(lib);
     step.linkLibC();
     return step;
 }
