@@ -95,7 +95,6 @@ pub fn main() !void {
 
 fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int {
     _ = jstate_opaque;
-    // const js: *JackState = @ptrCast(@alignCast(jstate_opaque));
     var iter = JackState.iterMidi(midiport, nframes, &in) catch return 1;
 
     var left_buffer = JackState.audioBuf(left, nframes) catch return 1;
@@ -137,18 +136,24 @@ fn cb(nframes: JackState.NFrames, jstate_opaque: ?*anyopaque) callconv(.C) c_int
             changed = true;
         }
     }
-
     if (changed) c.mt32emu_flush_midi_queue(munt_ctx);
 
-    for (0..nframes) |f| {
-        while (iter.nextRaw(@intCast(f))) |msg| {
-            c.mt32emu_parse_stream(munt_ctx, @ptrCast(msg), @intCast(msg.len));
-        }
-        // c.mt32emu_flush_midi_queue(munt_ctx);
-        var frame: [2]f32 = .{ 3, 4 };
-        c.mt32emu_render_float(munt_ctx, &frame, 1);
-        left_buffer[f] = frame[0];
-        right_buffer[f] = frame[1];
+    var current_time: usize = 0;
+    while (iter.get()) |ev| {
+        c.mt32emu_parse_stream(munt_ctx, @ptrCast(ev.buffer), @intCast(ev.size));
+        if (ev.time == current_time) continue;
+        c.mt32emu_render_float(munt_ctx, &buffer[current_time * 2], @intCast(ev.time - current_time));
+        current_time = @intCast(ev.time);
+    }
+    if (current_time != nframes) {
+        c.mt32emu_render_float(munt_ctx, &buffer[current_time * 2], @intCast(nframes - current_time));
+    }
+
+    for (0..nframes) |i| {
+        left_buffer[i] = buffer[i * 2];
+        right_buffer[i] = buffer[i * 2 + 1];
     }
     return 0;
 }
+
+var buffer: [65536]f32 = undefined;

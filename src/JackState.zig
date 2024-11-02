@@ -111,6 +111,14 @@ pub const MidiIterator = struct {
         return null;
     }
 
+    pub fn get(self: *MidiIterator) ?c.jack_midi_event_t {
+        if (self.count == self.idx) return null;
+        var ev: c.jack_midi_event_t = undefined;
+        if (0 != c.jack_midi_event_get(&ev, self.buffer, self.idx))
+            return null;
+        self.idx += 1;
+        return ev;
+    }
     pub fn nextRaw(self: *MidiIterator, time: NFrames) ?[]u8 {
         if (self.next_event == null and self.idx < self.count) {
             var ev: c.jack_midi_event_t = undefined;
