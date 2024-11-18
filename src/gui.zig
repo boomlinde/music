@@ -72,74 +72,87 @@ pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, redraw: 
             .y = @as(f32, @floatFromInt(rows)),
         });
 
-        if (redraw_all) bg.fill(r);
         for (layout, 0..) |row, y| for (row, 0..) |slot, x| switch (slot) {
             .empty => {},
             .slider => |*s| {
                 const value = s.value.get();
-                if (!(redraw_all or drawn[y][x] != value)) continue;
-                drawn[y][x] = value;
-
-                const p = Vec2{ .x = @floatFromInt(x), .y = @floatFromInt(y) };
-
-                const back = s.rect(p, w_ratio, margin);
-                const inner = Rect{
-                    .pos = back.pos.add(1),
-                    .dim = back.dim.sub(2).mul(.{
-                        .x = 1,
-                        .y = (1 - value),
-                    }),
-                };
-
-                const symbol_offset = back.pos.add(back.dim.mul(0.5));
-                const symbol_scale = @min(back.dim.x, back.dim.y) * 0.5 * 0.5;
-
-                (s.color orelse fg).apply(r);
-                back.fill(r);
-                bg.apply(r);
-                inner.fill(r);
-                s.symbol.draw(r, symbol_offset, symbol_scale);
-
-                (s.color orelse fg).apply(r);
-                _ = c.SDL_RenderSetClipRect(r, &inner.sdlRect());
-                s.symbol.draw(r, symbol_offset, symbol_scale);
-                _ = c.SDL_RenderSetClipRect(r, null);
+                if (drawn[y][x] != value) redraw_all = true;
             },
             .flag => |flag| {
                 const raised = flag.call();
                 const raised_float: f32 = if (raised) 1 else 0;
-                if (!redraw_all and drawn[y][x] == raised_float) continue;
-                drawn[y][x] = raised_float;
-                const rect = Rect{
-                    .pos = w_ratio.mul(Vec2{
-                        .x = @floatFromInt(x),
-                        .y = @floatFromInt(y),
-                    }).add(w_ratio.div(3)),
-                    .dim = w_ratio.div(3),
-                };
-                const frame = Rect{
-                    .pos = rect.pos.sub(1),
-                    .dim = rect.dim.add(2),
-                };
-
-                flag.color.apply(r);
-                frame.fill(r);
-
-                if (raised)
-                    flag.color.apply(r)
-                else
-                    bg.apply(r);
-                rect.fill(r);
+                if (drawn[y][x] != raised_float) redraw_all = true;
             },
         };
-        redraw_all = false;
 
-        _ = c.SDL_RenderPresent(r);
+        if (redraw_all) {
+            bg.fill(r);
+            for (layout, 0..) |row, y| for (row, 0..) |slot, x| switch (slot) {
+                .empty => {},
+                .slider => |*s| {
+                    const value = s.value.get();
+                    drawn[y][x] = value;
+
+                    const p = Vec2{ .x = @floatFromInt(x), .y = @floatFromInt(y) };
+
+                    const back = s.rect(p, w_ratio, margin);
+                    const inner = Rect{
+                        .pos = back.pos.add(1),
+                        .dim = back.dim.sub(2).mul(.{
+                            .x = 1,
+                            .y = (1 - value),
+                        }),
+                    };
+
+                    const symbol_offset = back.pos.add(back.dim.mul(0.5));
+                    const symbol_scale = @min(back.dim.x, back.dim.y) * 0.5 * 0.5;
+
+                    (s.color orelse fg).apply(r);
+                    back.fill(r);
+                    bg.apply(r);
+                    inner.fill(r);
+                    s.symbol.draw(r, symbol_offset, symbol_scale);
+
+                    (s.color orelse fg).apply(r);
+                    _ = c.SDL_RenderSetClipRect(r, &inner.sdlRect());
+                    s.symbol.draw(r, symbol_offset, symbol_scale);
+                    _ = c.SDL_RenderSetClipRect(r, null);
+                },
+                .flag => |flag| {
+                    const raised = flag.call();
+                    const raised_float: f32 = if (raised) 1 else 0;
+                    drawn[y][x] = raised_float;
+                    const rect = Rect{
+                        .pos = w_ratio.mul(Vec2{
+                            .x = @floatFromInt(x),
+                            .y = @floatFromInt(y),
+                        }).add(w_ratio.div(3)),
+                        .dim = w_ratio.div(3),
+                    };
+                    const frame = Rect{
+                        .pos = rect.pos.sub(1),
+                        .dim = rect.dim.add(2),
+                    };
+
+                    flag.color.apply(r);
+                    frame.fill(r);
+
+                    if (raised)
+                        flag.color.apply(r)
+                    else
+                        bg.apply(r);
+                    rect.fill(r);
+                },
+            };
+            _ = c.SDL_RenderPresent(r);
+            redraw_all = false;
+        }
 
         var ev: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&ev) == 0) {
             if (@atomicLoad(bool, redraw, .seq_cst)) {
                 // Don't worry about TOCTOU here; we're redrawing either way
+                redraw_all = true;
                 @atomicStore(bool, redraw, false, .seq_cst);
                 continue :mainloop;
             }
