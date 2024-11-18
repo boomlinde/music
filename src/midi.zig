@@ -41,8 +41,6 @@ pub const In = struct {
 
         if (Event.decode(self.status, self.buf[0..self.buflen])) |m| {
             self.buflen = 0;
-            // Drop the status if it's a system common message
-            if (self.status >= 0xf0) self.status = 0;
             return m;
         }
 
