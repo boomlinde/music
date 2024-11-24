@@ -1,8 +1,5 @@
 const std = @import("std");
 
-const ArenaAllocator = @import("std").heap.ArenaAllocator;
-const page_allocator = @import("std").heap.page_allocator;
-
 const match = @import("match.zig").match;
 
 pub const c = @cImport({
@@ -15,15 +12,24 @@ const State = struct { client: *c.jack_client_t };
 const Rule = struct { from: []const u8, to: []const u8 };
 
 var rules: RuleList = undefined;
+var mtime: i128 = -1;
+var cfgpath: []u8 = undefined;
 
 pub fn main() !void {
-    var aa = ArenaAllocator.init(page_allocator);
-    defer aa.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    const stdin = std.io.getStdIn().reader().any();
-
-    rules = try RuleList.read(stdin, aa.allocator());
+    rules = .{ .allocator = gpa.allocator() };
     defer rules.deinit();
+
+    cfgpath = try getConfigFilename(gpa.allocator());
+    defer gpa.allocator().free(cfgpath);
+
+    mtime = (try std.fs.cwd().statFile(cfgpath)).mtime;
+    const rulefile = try std.fs.cwd().openFile(cfgpath, .{});
+    const r = rulefile.reader().any();
+
+    rules = try RuleList.read(r, gpa.allocator());
 
     std.log.info("parsed {d} rules", .{rules.rules.len()});
 
@@ -42,9 +48,51 @@ pub fn main() !void {
     while (true) std.time.sleep(1 * std.time.ns_per_s);
 }
 
+fn maybeReloadRules() !void {
+    const current_mtime = (try std.fs.cwd().statFile(cfgpath)).mtime;
+    if (mtime == current_mtime) return;
+
+    mtime = current_mtime;
+    const rulefile = try std.fs.cwd().openFile(cfgpath, .{});
+    defer rulefile.close();
+
+    const r = rulefile.reader().any();
+
+    rules.deinit();
+    rules = try RuleList.read(r, rules.allocator);
+    std.log.info("parsed {d} rules", .{rules.rules.len()});
+}
+
+fn getConfigFilename(a: std.mem.Allocator) ![]u8 {
+    var iter = try std.process.argsWithAllocator(a);
+    defer iter.deinit();
+
+    // skip arg 0
+    if (!iter.skip()) return error.NoArguments;
+
+    const name = iter.next() orelse {
+        std.log.err("must supply config path", .{});
+        return error.NoFileName;
+    };
+
+    const name_dupe = try a.dupe(u8, name);
+    errdefer a.free(name_dupe);
+
+    if (iter.next() != null) {
+        std.log.err("too many arguments", .{});
+        return error.TooManyArgs;
+    }
+
+    return name_dupe;
+}
+
 fn portRegisteredCb(id: c.jack_port_id_t, register: c_int, arg: ?*anyopaque) callconv(.C) void {
     const state: *State = @alignCast(@ptrCast(arg));
     if (register < 1) return;
+
+    maybeReloadRules() catch |err| {
+        std.log.err("failed to reload rules: {}", .{err});
+    };
 
     const port = c.jack_port_by_id(state.client, id) orelse return;
     const pname = std.mem.span(c.jack_port_name(port) orelse return);
