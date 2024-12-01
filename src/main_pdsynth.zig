@@ -21,7 +21,7 @@ var synth: PdSynth = .{};
 var redraw = false;
 
 pub fn main() !void {
-    const name = "jack gui";
+    const name = "pdsynth";
 
     synth.init();
 

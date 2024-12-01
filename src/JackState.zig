@@ -97,6 +97,17 @@ pub fn iterMidi(port: *Port, nframes: NFrames, in: *midi.In) !MidiIterator {
     };
 }
 
+pub fn getMidiBuf(port: *Port, nframes: NFrames) !*anyopaque {
+    const buf = c.jack_port_get_buffer(port, nframes) orelse return error.BadMidiBuffer;
+    c.jack_midi_clear_buffer(buf);
+    return buf;
+}
+
+pub fn writeMidi(portbuf: *anyopaque, time: NFrames, data: []const u8) !void {
+    const res = c.jack_midi_event_write(portbuf, time, @ptrCast(@alignCast(&data[0])), data.len);
+    if (res != 0) return error.NoBuffers;
+}
+
 pub const MidiIterator = struct {
     count: NFrames,
     buffer: *anyopaque,
