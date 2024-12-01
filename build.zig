@@ -9,6 +9,7 @@ pub fn build(b: *std.Build) void {
     addExe(b, "autoconnect", "src/main_autoconnect.zig", target, optimize, &.{"jack"});
     addExe(b, "jack-mt32", "src/main_mt32.zig", target, optimize, &.{ "jack", "mt32emu", "sdl2" });
     addExe(b, "jack-activesensing", "src/main_activesensing.zig", target, optimize, &.{"jack"});
+    addExe(b, "karplus", "src/main_karplus.zig", target, optimize, &.{"jack"});
 }
 
 fn addExe(
