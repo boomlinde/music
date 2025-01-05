@@ -11,6 +11,7 @@ mode: enum {
     normal_escaped,
     string,
     string_escaped,
+    comment,
 } = .normal,
 
 fn append(self: *Tokenizer, ch: u8) !void {
@@ -37,6 +38,13 @@ fn consume(self: *Tokenizer, ch: u8) !?[]u8 {
                     try self.append(ch);
                 return self.emit();
             },
+            '#' => {
+                if (self.n > 0) {
+                    self.again = ch;
+                    return self.emit();
+                }
+                self.mode = .comment;
+            },
             '\\' => self.mode = .normal_escaped,
             '"' => self.mode = .string,
             else => try self.append(ch),
@@ -56,6 +64,9 @@ fn consume(self: *Tokenizer, ch: u8) !?[]u8 {
         .string_escaped => {
             try self.append(ch);
             self.mode = .string;
+        },
+        .comment => if (ch == '\n') {
+            self.mode = .normal;
         },
     }
     return null;
