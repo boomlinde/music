@@ -292,7 +292,7 @@ const Vec2 = struct {
 
     inline fn fromAny(value: anytype) Vec2 {
         return switch (@typeInfo(@TypeOf(value))) {
-            .@"struct" => value,
+            .@"struct" => .{ .x = value.x, .y = value.y },
             else => .{ .x = value, .y = value },
         };
     }
