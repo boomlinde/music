@@ -251,7 +251,7 @@ pub const Track = struct {
                             _ = try r.readAtLeast(buf, len);
                             return .{ .sequencer = buf };
                         },
-                        else => { // Skip unknown meta events
+                        else => { // unknown event
                             const buf = try allocator.alloc(u8, len);
                             errdefer allocator.free(buf);
                             _ = try r.readAtLeast(buf, len);
@@ -292,6 +292,7 @@ pub const Track = struct {
                     try pr.drop();
                     const len = try vlq.decode(r);
                     const buf = try a.alloc(u8, len);
+                    _ = try r.readAtLeast(buf, len);
                     return .{
                         .timedelta = timedelta,
                         .event = .{ .sysex = buf },
@@ -301,6 +302,7 @@ pub const Track = struct {
                     try pr.drop();
                     const len = try vlq.decode(r);
                     const buf = try a.alloc(u8, len);
+                    _ = try r.readAtLeast(buf, len);
                     return .{
                         .timedelta = timedelta,
                         .event = .{ .escaped = buf },
@@ -348,6 +350,7 @@ pub const Track = struct {
 
         while (lr.bytes_left != 0) {
             const event = try MTrkEvent.decode(r, &mp, a);
+            std.debug.print("{any}\n", .{event});
             const node = try a.create(Node);
             node.* = .{ .event = event };
 
