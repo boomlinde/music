@@ -139,7 +139,7 @@ fn process(nframes: c.jack_nframes_t, _: ?*anyopaque) callconv(.C) c_int {
     }
 
     for (0..nframes) |i| {
-        // All notes off if abort and sustain off
+        // All notes and sustain off if abort and sustain off
         if (@atomicLoad(bool, &abort, .seq_cst)) {
             // Signal that we've fulfilled the abortion request
             @atomicStore(bool, &aborted, true, .seq_cst);
@@ -148,6 +148,15 @@ fn process(nframes: c.jack_nframes_t, _: ?*anyopaque) callconv(.C) c_int {
                 const msg = midi.Event.ControlChange{
                     .channel = @intCast(ch),
                     .controller = 0x7b,
+                    .value = 0,
+                };
+                const bytes = msg.bytes();
+                writeEvent(buf, i, &bytes) catch return 1;
+            }
+            for (0..16) |ch| {
+                const msg = midi.Event.ControlChange{
+                    .channel = @intCast(ch),
+                    .controller = 0x40,
                     .value = 0,
                 };
                 const bytes = msg.bytes();
