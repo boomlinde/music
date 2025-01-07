@@ -44,6 +44,7 @@ Options:
 
 * `--gm`: Perform GM Start reset SysEx before playback
 * `--gs`: Perform GS reset before playback
+* `--mt`: Perform MT reset before playback
 * `--noresetcc`: Don't reset controllers before playback
 
 ## jack-activesensing
