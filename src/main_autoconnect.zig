@@ -42,6 +42,9 @@ pub fn main() !void {
     if (0 != c.jack_set_port_registration_callback(client, portRegisteredCb, &state))
         return error.FailedToSetPortRegisterCb;
 
+    if (0 != c.jack_activate(client))
+        return error.FailedToActivateClient;
+
     while (true) std.time.sleep(1 * std.time.ns_per_s);
 }
 
