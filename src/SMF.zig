@@ -376,44 +376,34 @@ header: Header,
 tracks: []Track,
 
 pub fn decode(r: std.io.AnyReader, allocator: std.mem.Allocator) !SMF {
-    var id: [4]u8 = undefined;
+    var idbuf: [4]u8 = undefined;
 
-    var ntrks: u16 = undefined;
-    var header: ?Header = null;
-    var tracks: ?[]Track = null;
+    var ntrks: u16 = 0;
     var trackidx: usize = 0;
 
+    // Read header chunk
+    _ = try r.readAtLeast(&idbuf, idbuf.len);
+    if (!std.mem.eql(u8, Header.id, &idbuf))
+        return error.InvalidSMFHeader;
+    const idlen = try r.readInt(u32, .big);
+    const header = try Header.decode(r, idlen, &ntrks);
+    const tracks = try allocator.alloc(Track, ntrks);
+
     errdefer {
-        if (tracks) |t| {
-            for (0..trackidx) |idx| t[idx].deinit(allocator);
-            allocator.free(t);
-        }
+        for (0..trackidx) |idx| tracks[idx].deinit(allocator);
+        allocator.free(tracks);
     }
 
-    while (true) {
-        const idlen = try r.read(&id);
-        if (idlen == 0) break;
-        if (idlen != 4) return error.UnexpectedEOF;
+    for (0..ntrks) |_| {
+        _ = try r.readAtLeast(&idbuf, idbuf.len);
+        if (!std.mem.eql(u8, Track.id, &idbuf)) return error.UnknownSMFChunk;
         const len = try r.readInt(u32, .big);
 
-        if (std.mem.eql(u8, Header.id, &id)) {
-            header = try Header.decode(r, len, &ntrks);
-            tracks = try allocator.alloc(Track, ntrks);
-        } else if (std.mem.eql(u8, Track.id, &id)) {
-            if (header == null) return error.TrackChunkAppearedBeforeHeaderChunk;
-            if (trackidx == ntrks) return error.TooManyTrackChunks;
-            const t = tracks orelse unreachable;
-            t[trackidx] = try Track.decode(r, len, allocator);
-            trackidx += 1;
-        } else {
-            try r.skipBytes(len, .{});
-            std.log.debug("skipping unknown chunk {s}", .{&id});
-        }
+        tracks[trackidx] = try Track.decode(r, len, allocator);
+        trackidx += 1;
     }
 
-    if (header) |h| if (tracks) |t| return .{ .header = h, .tracks = t };
-
-    return error.MissingHeader;
+    return .{ .header = header, .tracks = tracks };
 }
 
 pub fn deinit(self: *SMF, allocator: std.mem.Allocator) void {
