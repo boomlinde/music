@@ -88,6 +88,7 @@ fn tick(self: *SMFStreamer, buf: []SMF.Track.MTrkEvent.Event, buf_idx: *usize) !
 
     // Update tempo if there are any tempo meta events
     for (buf[orig_idx..buf_idx.*]) |event| {
+        std.log.debug("{any}", .{event});
         switch (event) {
             .meta => |m| switch (m) {
                 .set_tempo => |v| self.tempo = v,
