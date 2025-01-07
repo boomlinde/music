@@ -350,7 +350,6 @@ pub const Track = struct {
 
         while (lr.bytes_left != 0) {
             const event = try MTrkEvent.decode(r, &mp, a);
-            std.debug.print("{any}\n", .{event});
             const node = try a.create(Node);
             node.* = .{ .event = event };
 
