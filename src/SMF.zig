@@ -330,8 +330,7 @@ pub const Track = struct {
             }
         }
     };
-
-    const Node = struct {
+    pub const Node = struct {
         event: MTrkEvent,
         next: ?*Node = null,
     };
@@ -417,6 +416,20 @@ pub fn decode(r: std.io.AnyReader, allocator: std.mem.Allocator) !SMF {
 pub fn deinit(self: *SMF, allocator: std.mem.Allocator) void {
     for (self.tracks) |*track| track.deinit(allocator);
     allocator.free(self.tracks);
+}
+
+pub fn secondsPerTick(tempo: u24, division: SMF.Header.Division) f64 {
+    switch (division) {
+        .metrical => |v| {
+            const tempo_time_per_qn = @as(f64, @floatFromInt(tempo)) / std.time.us_per_s;
+            return tempo_time_per_qn / @as(f64, @floatFromInt(v));
+        },
+        .timecode => |v| {
+            const framerate: f64 = if (v.format == -29) 29.97 else @floatFromInt(-v.format);
+            const tickrate: f64 = @as(f64, @floatFromInt(v.ticks)) * framerate;
+            return 1 / tickrate;
+        },
+    }
 }
 
 test decode {

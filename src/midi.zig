@@ -246,23 +246,50 @@ pub const Event = union(enum) {
             }
 
             pub fn encode(self: T, buf: *EncodingBuf) ![]u8 {
-                try buf.append(if (@hasField(T, "channel"))
+                const arr = self.bytes();
+                for (arr) |b| {
+                    try buf.append(b);
+                }
+                return buf.emit();
+            }
+
+            pub fn bytes(self: T) [T.size()]u8 {
+                var out: [T.size()]u8 = undefined;
+
+                out[0] = (if (@hasField(T, "channel"))
                     statusMask | self.channel
                 else
                     statusMask);
-                inline for (std.meta.field(T)) |field| {
+                var idx: usize = 1;
+                inline for (std.meta.fields(T)) |field| {
                     switch (field.type) {
+                        u4 => {},
                         u7 => {
-                            try buf.append(@field(self, field.name));
+                            out[idx] = @field(self, field.name);
+                            idx += 1;
                         },
                         u14 => {
                             const v = @field(self, field.name);
-                            try buf.append(@intCast(v & 0x7f));
-                            try buf.append(@intCast(v >> 7));
+                            out[idx] = @intCast(v & 0x7f);
+                            idx += 1;
+                            out[idx] = @intCast(v >> 7);
+                            idx += 1;
                         },
                         else => @compileError("unexpected type " ++ @typeName(field.type)),
                     }
                 }
+                return out;
+            }
+
+            pub inline fn size() usize {
+                comptime var s: usize = 1;
+                inline for (std.meta.fields(T)) |field| switch (field.type) {
+                    u4 => {},
+                    u7 => s += 1,
+                    u14 => s += 2,
+                    else => @compileError("bad midi event field"),
+                };
+                return s;
             }
         };
     }
