@@ -1,6 +1,6 @@
 Various JACK music tools and experiments implemented in Zig
 
-Includes a MIDI stream parser (midi.zig) an SMF parser (SMFParser.zig) and an
+Includes a MIDI stream parser (midi.zig) an SMF parser (SMF.zig) and an
 SMF player library (SMFStreamer.zig).
 
 # Synths
