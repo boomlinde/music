@@ -262,35 +262,35 @@ const Rect = struct {
     }
 };
 
-const Vec2 = struct {
+pub const Vec2 = struct {
     x: f32,
     y: f32,
 
-    fn fromAngle(a: f32) Vec2 {
+    pub fn fromAngle(a: f32) Vec2 {
         return .{ .x = @cos(a), .y = @sin(a) };
     }
 
-    fn add(self: Vec2, other: anytype) Vec2 {
+    pub fn add(self: Vec2, other: anytype) Vec2 {
         const vo = fromAny(other);
         return .{ .x = self.x + vo.x, .y = self.y + vo.y };
     }
 
-    fn sub(self: Vec2, other: anytype) Vec2 {
+    pub fn sub(self: Vec2, other: anytype) Vec2 {
         const vo = fromAny(other);
         return .{ .x = self.x - vo.x, .y = self.y - vo.y };
     }
 
-    fn mul(self: Vec2, other: anytype) Vec2 {
+    pub fn mul(self: Vec2, other: anytype) Vec2 {
         const vo = fromAny(other);
         return .{ .x = self.x * vo.x, .y = self.y * vo.y };
     }
 
-    fn div(self: Vec2, other: anytype) Vec2 {
+    pub fn div(self: Vec2, other: anytype) Vec2 {
         const vo = fromAny(other);
         return .{ .x = self.x / vo.x, .y = self.y / vo.y };
     }
 
-    inline fn fromAny(value: anytype) Vec2 {
+    pub inline fn fromAny(value: anytype) Vec2 {
         return switch (@typeInfo(@TypeOf(value))) {
             .@"struct" => .{ .x = value.x, .y = value.y },
             else => .{ .x = value, .y = value },
@@ -307,11 +307,11 @@ pub const RGB = struct {
         return .{ .r = r, .g = g, .b = b };
     }
 
-    fn apply(self: RGB, r: *c.SDL_Renderer) void {
+    pub fn apply(self: RGB, r: *c.SDL_Renderer) void {
         _ = c.SDL_SetRenderDrawColor(r, self.r, self.g, self.b, 255);
     }
 
-    fn fill(self: RGB, r: *c.SDL_Renderer) void {
+    pub fn fill(self: RGB, r: *c.SDL_Renderer) void {
         self.apply(r);
         _ = c.SDL_RenderFillRect(r, null);
     }

@@ -17,13 +17,13 @@ pub const DefaultAudioType = c.JACK_DEFAULT_AUDIO_TYPE;
 pub const Sample = c.jack_default_audio_sample_t;
 
 processCb: ProcessCb,
-userdata: *anyopaque,
+userdata: ?*anyopaque,
 
 client: ?*c.jack_client_t,
 active: bool = false,
 samplerate: c.jack_nframes_t = 1,
 
-pub fn init(name: [*c]const u8, processCb: ProcessCb, userdata: *anyopaque) !JackState {
+pub fn init(name: [*c]const u8, processCb: ProcessCb, userdata: ?*anyopaque) !JackState {
     const client = c.jack_client_open(name, c.JackNoStartServer, null) orelse
         return error.FailedToCreateJackClient;
 

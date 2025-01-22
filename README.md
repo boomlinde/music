@@ -51,3 +51,7 @@ Options:
 
 Simply generate a steady stream of MIDI active sensing messages.
 
+## midivis
+
+Visualizes all the incoming MIDI notes on one keyboard display for each
+channel.
