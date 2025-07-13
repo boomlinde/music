@@ -29,12 +29,14 @@ and pcm\_mt32.rom in cwd.
 Listens for new JACK ports and automatically connects them according to a
 rule file with rules in the following format:
 
-    from "source1:port" to "destination1:port"
-    from "source2:port" to "destination2:port"
+    connect "source1:port" to "destination1:port"
+    connect "source2:port" to "destination2:port"
+    disconnect "source3:port" from "destination3:port"
 
 * It accepts wildcards (`*` and `?`) in the port names.
-* It reloads the rule list every time something is connected, so you can
-  change the rules without restarting it.
+* Clients are disconnected only if there are no matching connect rules
+* It reloads the rule list every time something is connected or a new port is
+  created, so you can change the rules without restarting it.
 
 ## smfplay
 

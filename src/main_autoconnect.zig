@@ -9,7 +9,8 @@ pub const c = @cImport({
 
 const State = struct { client: *c.jack_client_t };
 
-const Rule = struct { from: []const u8, to: []const u8 };
+const RuleType = enum { connect, disconnect, reconnect };
+const Rule = struct { src: []const u8, dst: []const u8 };
 
 var rules: RuleList = undefined;
 var mtime: i128 = -1;
@@ -31,7 +32,7 @@ pub fn main() !void {
 
     rules = try RuleList.read(r, gpa.allocator());
 
-    std.log.info("parsed {d} rules", .{rules.rules.len()});
+    std.log.info("parsed {d} rules", .{rules.connect.len() + rules.disconnect.len()});
 
     const client = c.jack_client_open("autoconnect", c.JackNoStartServer, null) orelse
         return error.FailedToCreateJackClient;
@@ -41,6 +42,9 @@ pub fn main() !void {
 
     if (0 != c.jack_set_port_registration_callback(client, portRegisteredCb, &state))
         return error.FailedToSetPortRegisterCb;
+
+    if (0 != c.jack_set_port_connect_callback(client, portConnectedCb, &state))
+        return error.FailedToSetPortConnectCb;
 
     if (0 != c.jack_activate(client))
         return error.FailedToActivateClient;
@@ -60,7 +64,7 @@ fn maybeReloadRules() !void {
 
     rules.deinit();
     rules = try RuleList.read(r, rules.allocator);
-    std.log.info("parsed {d} rules", .{rules.rules.len()});
+    std.log.info("parsed {d} rules", .{rules.connect.len() + rules.disconnect.len()});
 }
 
 fn getConfigFilename(a: std.mem.Allocator) ![]u8 {
@@ -86,6 +90,50 @@ fn getConfigFilename(a: std.mem.Allocator) ![]u8 {
     return name_dupe;
 }
 
+fn portConnectedCb(a: c.jack_port_id_t, b: c.jack_port_id_t, connect: c_int, arg: ?*anyopaque) callconv(.C) void {
+    const state: *State = @alignCast(@ptrCast(arg));
+
+    if (connect == 0) return;
+
+    maybeReloadRules() catch |err| {
+        std.log.err("failed to reload rules: {}", .{err});
+    };
+
+    const aport = c.jack_port_by_id(state.client, a) orelse return;
+    const aname = std.mem.span(c.jack_port_name(aport) orelse return);
+    const bport = c.jack_port_by_id(state.client, b) orelse return;
+    const bname = std.mem.span(c.jack_port_name(bport) orelse return);
+
+    // Check whether any of the connect rules match
+    // Don't disconnect if there is
+    var current = rules.connect.first;
+    while (current) |node| : (current = node.next) {
+        const rule = node.data;
+        if (match(rule.src, aname) and match(rule.dst, bname)) return;
+        if (match(rule.src, bname) and match(rule.dst, aname)) return;
+    }
+
+    // Disconnect if any matching disconnect rules are found
+    current = rules.disconnect.first;
+    while (current) |node| : (current = node.next) {
+        const rule = node.data;
+        var matched: bool = false;
+        if (match(rule.src, aname) and match(rule.dst, bname)) matched = true;
+        if (match(rule.src, bname) and match(rule.dst, aname)) matched = true;
+
+        if (matched) {
+            if ((c.jack_port_flags(aport) & c.JackPortIsOutput) != 0) {
+                std.log.info("disconnecting '{s}' from '{s}'", .{ aname, bname });
+                _ = c.jack_disconnect(state.client, aname, bname);
+            } else {
+                std.log.info("disconnecting '{s}' from '{s}'", .{ bname, aname });
+                _ = c.jack_disconnect(state.client, bname, aname);
+            }
+
+            return;
+        }
+    }
+}
 fn portRegisteredCb(id: c.jack_port_id_t, register: c_int, arg: ?*anyopaque) callconv(.C) void {
     const state: *State = @alignCast(@ptrCast(arg));
     if (register < 1) return;
@@ -102,18 +150,18 @@ fn portRegisteredCb(id: c.jack_port_id_t, register: c_int, arg: ?*anyopaque) cal
     const outputs = c.jack_get_ports(state.client, null, null, c.JackPortIsOutput) orelse return;
     defer c.jack_free(@ptrCast(outputs));
 
-    var current = rules.rules.first;
+    var current = rules.connect.first;
     while (current) |node| : (current = node.next) {
         const rule = node.data;
-        if (match(rule.from, pname)) {
+        if (match(rule.src, pname)) {
             var iter = PortIterator{ .client = state.client, .ports = inputs };
-            while (iter.next()) |name| if (match(rule.to, name)) {
+            while (iter.next()) |name| if (match(rule.dst, name)) {
                 std.log.info("connecting '{s}' to '{s}'", .{ pname, name });
                 _ = c.jack_connect(state.client, @ptrCast(pname), @ptrCast(name));
             };
-        } else if (match(rule.to, pname)) {
+        } else if (match(rule.dst, pname)) {
             var iter = PortIterator{ .client = state.client, .ports = outputs };
-            while (iter.next()) |name| if (match(rule.from, name)) {
+            while (iter.next()) |name| if (match(rule.src, name)) {
                 std.log.info("connecting '{s}' to '{s}'", .{ name, pname });
                 _ = c.jack_connect(state.client, @ptrCast(name), @ptrCast(pname));
             };
@@ -134,16 +182,26 @@ const PortIterator = struct {
 };
 
 const RuleList = struct {
-    rules: std.SinglyLinkedList(Rule) = .{},
+    connect: std.SinglyLinkedList(Rule) = .{},
+    disconnect: std.SinglyLinkedList(Rule) = .{},
     allocator: std.mem.Allocator,
 
     fn deinit(self: *RuleList) void {
-        var current = self.rules.first;
+        var current = self.connect.first;
         while (current) |node| {
             current = node.next;
 
-            self.allocator.free(node.data.from);
-            self.allocator.free(node.data.to);
+            self.allocator.free(node.data.src);
+            self.allocator.free(node.data.dst);
+            self.allocator.destroy(node);
+        }
+
+        current = self.disconnect.first;
+        while (current) |node| {
+            current = node.next;
+
+            self.allocator.free(node.data.src);
+            self.allocator.free(node.data.dst);
             self.allocator.destroy(node);
         }
     }
@@ -159,17 +217,31 @@ const RuleList = struct {
         const p = Parser{ .tokenizer = &t };
 
         while (try t.next()) |token| {
-            if (!std.mem.eql(u8, token, "from")) {
-                std.log.err("expected 'from', got '{s}'", .{token});
-                return error.ExpectedFrom;
+            var isconnect: bool = false;
+            if (std.mem.eql(u8, token, "connect")) {
+                isconnect = true;
+            } else if (std.mem.eql(u8, token, "disconnect")) {
+                isconnect = false;
+            } else {
+                std.log.err("expected 'connect' or 'disconnect', got '{s}'", .{token});
+                return error.ExpectedType;
             }
-            const from = try p.expectWithStringAllocator([]u8, a);
-            try p.expectLiteral("to");
-            const to = try p.expectWithStringAllocator([]u8, a);
+
+            const src = try p.expectWithStringAllocator([]u8, a);
+            if (isconnect)
+                try p.expectLiteral("to")
+            else
+                try p.expectLiteral("from");
+            const dst = try p.expectWithStringAllocator([]u8, a);
+
             const rule_node = try a.create(std.SinglyLinkedList(Rule).Node);
 
-            rule_node.* = .{ .data = .{ .from = from, .to = to } };
-            list.rules.prepend(rule_node);
+            rule_node.* = .{ .data = .{ .src = src, .dst = dst } };
+
+            if (isconnect)
+                list.connect.prepend(rule_node)
+            else
+                list.disconnect.prepend(rule_node);
         }
         return list;
     }
