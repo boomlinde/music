@@ -35,6 +35,15 @@ fn innerExpect(self: Parser, comptime T: type, string_allocator: ?std.mem.Alloca
         },
         .@"enum" => std.meta.stringToEnum(T, try self.mustNext()) orelse error.BadEnumValue,
         .@"struct" => self.expectStruct(T, string_allocator),
+        .array => |ainfo| arrblk: {
+            var out: [ainfo.len]ainfo.child = undefined;
+            try self.expectLiteral("[");
+            for (0..ainfo.len) |i| {
+                out[i] = try self.innerExpect(ainfo.child, string_allocator);
+            }
+            try self.expectLiteral("]");
+            break :arrblk out;
+        },
         else => @compileError("unsupported type"),
     };
 }
@@ -72,8 +81,9 @@ test Parser {
             x: f32,
             y: f64,
         },
+        x: [3]i8,
     };
-    var r = testStream("{ hello\\ world: 32 b: 64 c:{x: -1.3 y: 13 }}");
+    var r = testStream("{ hello\\ world: 32 b: 64 c:{x: -1.3 y: 13 } x: [1 2 3] }");
     var tokenbuf: [100]u8 = undefined;
     var tokenizer = Tokenizer{
         .reader = r.reader().any(),
@@ -86,6 +96,7 @@ test Parser {
     try t.expectEqual(v.b, 64);
     try t.expectEqual(v.c.x, -1.3);
     try t.expectEqual(v.c.y, 13);
+    try t.expectEqual([3]i8{ 1, 2, 3 }, v.x);
 }
 
 fn testStream(str: []const u8) std.io.FixedBufferStream([]const u8) {

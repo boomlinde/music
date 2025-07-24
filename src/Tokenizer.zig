@@ -31,7 +31,7 @@ fn consume(self: *Tokenizer, ch: u8) !?[]u8 {
     switch (self.mode) {
         .normal => switch (ch) {
             '\n', '\r', ' ', '\t' => return self.emit(),
-            '{', '}', ':' => {
+            '{', '}', ':', '[', ']' => {
                 if (self.n > 0)
                     self.again = ch
                 else
