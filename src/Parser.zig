@@ -63,6 +63,8 @@ fn expectStruct(self: Parser, comptime T: type, string_allocator: ?std.mem.Alloc
                 continue :fieldloop;
             }
         }
+
+        return error.UnknownStructFieldName;
     }
 
     return out;
