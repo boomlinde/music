@@ -51,14 +51,19 @@ fn innerExpect(self: Parser, comptime T: type, string_allocator: ?std.mem.Alloca
 fn expectStruct(self: Parser, comptime T: type, string_allocator: ?std.mem.Allocator) !T {
     var out: T = undefined;
     try self.expectLiteral("{");
-    inline for (std.meta.fields(T)) |field| {
-        const name = try self.expect([]u8);
-        if (!std.mem.eql(u8, name, field.name)) return error.UnexpectedFieldName;
-        try self.expectLiteral(":");
-        const value = try self.innerExpect(field.type, string_allocator);
-        @field(out, field.name) = value;
+    fieldloop: while (true) {
+        const name_or_end = try self.expect([]u8);
+        if (std.mem.eql(u8, name_or_end, "}")) break;
+
+        inline for (std.meta.fields(T)) |field| {
+            if (std.mem.eql(u8, name_or_end, field.name)) {
+                try self.expectLiteral(":");
+                const value = try self.innerExpect(field.type, string_allocator);
+                @field(out, field.name) = value;
+                continue :fieldloop;
+            }
+        }
     }
-    try self.expectLiteral("}");
 
     return out;
 }
@@ -75,13 +80,13 @@ fn mustNext(self: Parser) ![]u8 {
 test Parser {
     const t = std.testing;
     const T = struct {
+        x: [3]i8,
         @"hello world": u8,
         b: i16,
         c: struct {
             x: f32,
             y: f64,
         },
-        x: [3]i8,
     };
     var r = testStream("{ hello\\ world: 32 b: 64 c:{x: -1.3 y: 13 } x: [1 2 3] }");
     var tokenbuf: [100]u8 = undefined;
