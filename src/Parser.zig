@@ -13,6 +13,49 @@ pub fn expectWithStringAllocator(self: Parser, comptime T: type, string_allocato
     return self.innerExpect(T, string_allocator);
 }
 
+pub fn serialize(d: anytype, w: std.io.AnyWriter) !void {
+    const T = @TypeOf(d);
+    switch (@typeInfo(T)) {
+        .int => try w.print("{} ", .{d}),
+        .float => try w.print("{d} ", .{d}),
+        .pointer => switch (T) {
+            []u8 => {
+                try w.print("\"", .{});
+                for (d) |char| switch (char) {
+                    '\\' => try w.print("\\\\", .{}),
+                    '\"' => try w.print("\\\"", .{}),
+                    else => try w.writeByte(char),
+                };
+                try w.print("\" ", .{});
+            },
+            else => @compileError("unsupported slice/pointer type " ++ @typeName(T)),
+        },
+        .bool => try w.print("{s} ", .{if (d) "true" else "false"}),
+        .@"enum" => try w.print("{s} ", .{enumString(d)}),
+        .@"struct" => {
+            try w.print("{{ ", .{});
+            inline for (std.meta.fields(T)) |f| {
+                try w.print("{s}: ", .{f.name});
+                try serialize(@field(d, f.name), w);
+            }
+            try w.print("}} ", .{});
+        },
+        .array => {
+            try w.print("[ ", .{});
+            for (d) |v| try serialize(v, w);
+            try w.print("] ", .{});
+        },
+        else => @compileError("unsupported type"),
+    }
+}
+
+fn enumString(v: anytype) []u8 {
+    inline for (std.meta.fields(@TypeOf(v))) |f| {
+        if (f.value == v) return f.name;
+    }
+    return error.BadEnumValue;
+}
+
 fn innerExpect(self: Parser, comptime T: type, string_allocator: ?std.mem.Allocator) !T {
     return switch (@typeInfo(T)) {
         .int => std.fmt.parseInt(T, try self.mustNext(), 0),
@@ -80,17 +123,18 @@ fn mustNext(self: Parser) ![]u8 {
 }
 
 test Parser {
+    const teststr = "{ hello: 32 b: 64 c: { x: -1.3 y: 13 } x: [ 1 2 3 ] } ";
     const t = std.testing;
     const T = struct {
-        x: [3]i8,
-        @"hello world": u8,
+        hello: u8,
         b: i16,
         c: struct {
             x: f32,
             y: f64,
         },
+        x: [3]i8,
     };
-    var r = testStream("{ hello\\ world: 32 b: 64 c:{x: -1.3 y: 13 } x: [1 2 3] }");
+    var r = testStream(teststr);
     var tokenbuf: [100]u8 = undefined;
     var tokenizer = Tokenizer{
         .reader = r.reader().any(),
@@ -99,11 +143,18 @@ test Parser {
     const parser = Parser{ .tokenizer = &tokenizer };
 
     const v = try parser.expect(T);
-    try t.expectEqual(v.@"hello world", 32);
+    try t.expectEqual(v.hello, 32);
     try t.expectEqual(v.b, 64);
     try t.expectEqual(v.c.x, -1.3);
     try t.expectEqual(v.c.y, 13);
     try t.expectEqual([3]i8{ 1, 2, 3 }, v.x);
+
+    // Serialize
+    var wrbuf: [256]u8 = undefined;
+    var w = std.io.FixedBufferStream([]u8){ .buffer = &wrbuf, .pos = 0 };
+    try serialize(v, w.writer().any());
+    const out = wrbuf[0..w.pos];
+    try t.expectEqualStrings(teststr, out);
 }
 
 fn testStream(str: []const u8) std.io.FixedBufferStream([]const u8) {
