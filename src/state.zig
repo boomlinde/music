@@ -5,7 +5,7 @@ const Tokenizer = @import("Tokenizer.zig");
 
 const org = "Text Garden";
 
-pub fn load(app: [*c]const u8, fname: [*c]const u8, comptime T: type) !T {
+pub fn load(app: [*c]const u8, fname: []const u8, comptime T: type) !T {
     const path = try getPath(app, fname, null);
     const cwd = std.fs.cwd();
 
@@ -31,7 +31,7 @@ pub fn load(app: [*c]const u8, fname: [*c]const u8, comptime T: type) !T {
     return try parser.expect(T);
 }
 
-pub fn save(app: [*c]const u8, fname: [*c]const u8, v: anytype) !void {
+pub fn save(app: [*c]const u8, fname: []const u8, v: anytype) !void {
     const path = try getPath(app, fname, ".tmp");
     const cwd = std.fs.cwd();
 
@@ -50,9 +50,10 @@ pub fn save(app: [*c]const u8, fname: [*c]const u8, v: anytype) !void {
     try cwd.rename(path, path[0 .. path.len - 4]);
 }
 
-fn getPath(app: [*c]const u8, fname: [*c]const u8, suffix: ?[]const u8) ![]const u8 {
+fn getPath(app: [*c]const u8, fname: []const u8, suffix: ?[]const u8) ![]const u8 {
     const prefpath_c = c.SDL_GetPrefPath(org, app) orelse
         return error.FailedGetPrefPath;
+    defer c.SDL_free(prefpath_c);
     return if (suffix) |suf|
         try std.fmt.bufPrint(&pathbuf, "{s}{s}{s}", .{ std.mem.span(prefpath_c), fname, suf })
     else
