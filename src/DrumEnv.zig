@@ -8,7 +8,7 @@ pub const Params = struct {
     time: f32 = 0.1,
     shape: f32 = 0,
 
-    usingnamespace Accessor(@This());
+    pub usingnamespace Accessor(@This());
 };
 
 pub fn trigger(self: *DrumEnv) void {

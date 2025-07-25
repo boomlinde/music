@@ -9,6 +9,18 @@ pub fn Accessor(comptime T: type) type {
         pub inline fn get(self: *const T, comptime field: E) FieldType(T, field) {
             const FT = FieldType(T, field);
 
+            if (comptime isArray(FT)) {
+                var out: FT = undefined;
+
+                for (&@field(self, @tagName(field)), 0..) |*p, i| {
+                    out[i] = if (comptime isAccessor(@TypeOf(p.*)))
+                        p.copy()
+                    else
+                        @atomicLoad(@TypeOf(p.*), p, .seq_cst);
+                }
+                return out;
+            }
+
             return if (comptime isAccessor(FT))
                 @field(self, @tagName(field)).copy()
             else
@@ -38,6 +50,13 @@ pub fn Accessor(comptime T: type) type {
                 self.set(@field(E, f.name), @field(prototype, f.name));
             }
         }
+    };
+}
+
+fn isArray(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .array => true,
+        else => false,
     };
 }
 

@@ -1,8 +1,6 @@
 const std = @import("std");
 
-const c = @cImport({
-    @cInclude("SDL.h");
-});
+const c = @import("sdl.zig").c;
 
 pub fn init() !void {
     if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS) != 0)

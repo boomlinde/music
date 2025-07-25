@@ -15,7 +15,7 @@ last_played: usize = 9999,
 pub const Params = struct {
     sets: [12]Voice.Params = [_]Voice.Params{.{}} ** 12,
 
-    usingnamespace Accessor(@This());
+    pub usingnamespace Accessor(@This());
 };
 
 pub const Out = struct {
@@ -73,7 +73,7 @@ const Voice = struct {
         q: f32 = 0,
         bus: u2 = 0,
 
-        usingnamespace Accessor(@This());
+        pub usingnamespace Accessor(@This());
     };
 
     fn trigger(self: *Voice) void {

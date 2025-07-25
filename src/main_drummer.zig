@@ -1,6 +1,7 @@
 const std = @import("std");
 const gui = @import("gui.zig");
 const midi = @import("midi.zig");
+const state = @import("state.zig");
 
 const JackState = @import("JackState.zig");
 const DrumSynth = @import("DrumSynth.zig");
@@ -30,6 +31,11 @@ pub fn main() !void {
 
     try gui.init();
     defer gui.deinit();
+
+    params = try state.load("drummer", "patch", DrumSynth.Params);
+    defer state.save("drummer", "patch", params.copy()) catch |err| {
+        std.log.err("failed save: {any}", .{err});
+    };
 
     var js = try JackState.init(name, cb, undefined);
     defer js.deinit();
