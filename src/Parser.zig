@@ -92,7 +92,7 @@ fn innerExpect(self: Parser, comptime T: type, string_allocator: ?std.mem.Alloca
 }
 
 fn expectStruct(self: Parser, comptime T: type, string_allocator: ?std.mem.Allocator) !T {
-    var out: T = undefined;
+    var out: T = .{};
     try self.expectLiteral("{");
     fieldloop: while (true) {
         const name_or_end = try self.expect([]u8);
@@ -126,13 +126,13 @@ test Parser {
     const teststr = "{ hello: 32 b: 64 c: { x: -1.3 y: 13 } x: [ 1 2 3 ] } ";
     const t = std.testing;
     const T = struct {
-        hello: u8,
-        b: i16,
+        hello: u8 = 0,
+        b: i16 = 1,
         c: struct {
-            x: f32,
-            y: f64,
-        },
-        x: [3]i8,
+            x: f32 = 2,
+            y: f64 = 3,
+        } = .{},
+        x: [3]i8 = .{ 4, 5, 6 },
     };
     var r = testStream(teststr);
     var tokenbuf: [100]u8 = undefined;
