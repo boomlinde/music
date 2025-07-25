@@ -28,6 +28,9 @@ var synth: DrumSynth = .{};
 pub fn main() !void {
     const name = "drummer";
 
+    try gui.init();
+    defer gui.deinit();
+
     var js = try JackState.init(name, cb, undefined);
     defer js.deinit();
 

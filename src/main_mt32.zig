@@ -31,6 +31,9 @@ var cbrange: [8]u5 = [_]u5{12} ** 8;
 pub fn main() !void {
     const name = "jack-mt32";
 
+    try gui.init();
+    defer gui.deinit();
+
     var js = try JackState.init(name, cb, undefined);
     defer js.deinit();
 

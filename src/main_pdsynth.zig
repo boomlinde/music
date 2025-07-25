@@ -23,6 +23,9 @@ var redraw = false;
 pub fn main() !void {
     const name = "pdsynth";
 
+    try gui.init();
+    defer gui.deinit();
+
     synth.init();
 
     var js = try JackState.init(name, cb, undefined);

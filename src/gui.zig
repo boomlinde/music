@@ -4,6 +4,15 @@ const c = @cImport({
     @cInclude("SDL.h");
 });
 
+pub fn init() !void {
+    if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS) != 0)
+        return error.FailedInitSDL;
+}
+
+pub fn deinit() void {
+    c.SDL_Quit();
+}
+
 pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, redraw: *bool, layout: anytype) !void {
     const margin: f32 = 0.1;
 
@@ -31,10 +40,6 @@ pub fn run(title: [*c]const u8, ww: c_int, wh: c_int, bg: RGB, fg: RGB, redraw: 
 
     var selected: ?Slider = null;
     var selected_idx: struct { usize, usize } = .{ 0, 0 };
-
-    if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS) != 0)
-        return error.FailedInitSDL;
-    defer c.SDL_Quit();
 
     const w = c.SDL_CreateWindow(
         title,
