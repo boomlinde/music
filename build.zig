@@ -5,6 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     addExe(b, "pdsynth", "src/main_pdsynth.zig", target, optimize, &.{ "sdl2", "jack" });
+    addExe(b, "fmbass", "src/main_fmbass.zig", target, optimize, &.{ "sdl2", "jack" });
     addExe(b, "drummer", "src/main_drummer.zig", target, optimize, &.{ "sdl2", "jack" });
     addExe(b, "autoconnect", "src/main_autoconnect.zig", target, optimize, &.{"jack"});
     addExe(b, "jack-mt32", "src/main_mt32.zig", target, optimize, &.{ "jack", "mt32emu", "sdl2" });

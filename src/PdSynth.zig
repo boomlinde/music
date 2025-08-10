@@ -6,6 +6,7 @@ const Smoother = @import("Smoother.zig");
 const PdSynth = @This();
 
 const nvoices = 8;
+const param_smooth = 0.1;
 
 voices: [nvoices]PdVoice = [_]PdVoice{.{}} ** nvoices,
 links: [nvoices]RoundRobinManager.Link = undefined,
@@ -13,9 +14,9 @@ man: RoundRobinManager = .{},
 params: PdVoice.Params = .{},
 shared: PdVoice.Shared = .{},
 
-timbre_smoother: Smoother = .{ .time = 0.1 },
-mod_ratio_smoother: Smoother = .{ .time = 0.1 },
-vel_ratio_smoother: Smoother = .{ .time = 0.1 },
+timbre_smoother: Smoother = .{},
+mod_ratio_smoother: Smoother = .{},
+vel_ratio_smoother: Smoother = .{},
 
 pub fn init(self: *PdSynth) void {
     for (0..nvoices) |i| {
@@ -47,9 +48,9 @@ pub fn handleMidiEvent(self: *PdSynth, event: midi.Event) void {
 
 pub inline fn next(self: *PdSynth, srate: f32) f32 {
     // Update shared smoothers
-    self.shared.smooth_timbre = self.timbre_smoother.next(self.params.timbre, srate);
-    self.shared.smooth_mod_ratio = self.mod_ratio_smoother.next(self.params.mod_ratio, srate);
-    self.shared.smooth_vel_ratio = self.vel_ratio_smoother.next(self.params.vel_ratio, srate);
+    self.shared.smooth_timbre = self.timbre_smoother.next(self.params.timbre, param_smooth, srate);
+    self.shared.smooth_mod_ratio = self.mod_ratio_smoother.next(self.params.mod_ratio, param_smooth, srate);
+    self.shared.smooth_vel_ratio = self.vel_ratio_smoother.next(self.params.vel_ratio, param_smooth, srate);
 
     // Calculate next sample
     var sum: f32 = 0;
