@@ -38,12 +38,20 @@ pub fn main() !void {
 
     try js.activate();
 
-    const layout = [1][4]Slot{
+    const layout = [2][5]Slot{
         .{
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.car_mul) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.mod_mul) } },
+            .{ .slider = .{ .value = Value.passthrough(&synth.params.res) } },
+            .{ .slider = .{ .value = Value.passthrough(&synth.params.timbre) } },
+            .{ .slider = .{ .value = Value.passthrough(&synth.params.feedback) } },
+            .{ .slider = .{ .value = Value.passthrough(&synth.params.mod_env.time) } },
             .{ .slider = .{ .value = Value.passthrough(&synth.params.mod_depth) } },
+        },
+        .{
             .{ .slider = .{ .value = Value.int(u4, &synth.params.channel) } },
+            .empty,
+            .empty,
+            .empty,
+            .empty,
         },
     };
     try gui.run(name, 800, 600, bg, fg, &redraw, layout);
