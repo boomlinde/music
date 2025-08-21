@@ -42,12 +42,13 @@ bend_smooth: Smoother = .{},
 res_smooth: Smoother = .{},
 timbre_smooth: Smoother = .{},
 feedback_smooth: Smoother = .{},
+mod_smooth: Smoother = .{},
 
 pub inline fn next(self: *FMBass, srate: f32) f32 {
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
     const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
     const res = self.res_smooth.next(self.params.get(.res), param_smooth_time, srate);
-    const mod = self.params.get(.mod_depth);
+    const mod = self.mod_smooth.next(self.params.get(.mod_depth), param_smooth_time, srate);
     const feedback = self.feedback_smooth.next(self.params.get(.feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
 
