@@ -14,10 +14,9 @@ pub const Params = struct {
     res: f32 = 0,
     timbre: f32 = 0.5,
     feedback: f32 = 0,
-    mod_depth: f32 = 0,
-
-    mod_env: DrumEnv.Params = .{ .shape = 0 },
-
+    mod_depth: f32 = 0.5,
+    accentness: f32 = 0.5,
+    decay: f32 = 0.5,
     channel: u4 = 0,
 
     pub usingnamespace Accessor(@This());
@@ -38,6 +37,7 @@ prev_res: f32 = 0,
 mod_env: DrumEnv = .{},
 prev_gate: bool = false,
 
+accentness_smooth: Smoother = .{},
 bend_smooth: Smoother = .{},
 res_smooth: Smoother = .{},
 timbre_smooth: Smoother = .{},
@@ -45,6 +45,7 @@ feedback_smooth: Smoother = .{},
 mod_smooth: Smoother = .{},
 
 pub inline fn next(self: *FMBass, srate: f32) f32 {
+    const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
     const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
     const res = self.res_smooth.next(self.params.get(.res), param_smooth_time, srate);
@@ -57,15 +58,23 @@ pub inline fn next(self: *FMBass, srate: f32) f32 {
     }
     self.prev_gate = self.man.state.gate;
 
-    const mod_env = self.mod_env.next(&self.params.mod_env, srate);
+    const accentness = if (state.velocity >= 96) accentness_raw else 0;
+    const mp: DrumEnv.Params = if (accentness > 0)
+        .{ .time = 0.2, .shape = 0.5 }
+    else
+        .{ .time = self.params.get(.decay), .shape = 0.5 };
+    const mod_env = self.mod_env.next(&mp, srate);
 
     const fb = self.prev * feedback;
 
     const pitch = state.pitch + bend;
 
-    const nt = normal(timbre) * lerp(1, mod_env, mod);
+    const amod = lerp(mod, 1, accentness);
+    const nt = normal(timbre);
+    const nt4 = 1 - (1 - nt) * (1 - nt) * (1 - nt);
+    const total_mod = lerp(nt, 1, lerp(0, accentness, nt4)) * lerp(1, mod_env, amod);
 
-    const res_freq = 440.0 * std.math.pow(f32, 2.0, (nt * 96 + 24 - 69) / 12);
+    const res_freq = 440.0 * std.math.pow(f32, 2.0, (total_mod * 96 + 32 - 69) / 12);
     defer self.res_phase = @mod(self.res_phase + res_freq / srate, 1);
 
     const freq = 440.0 * std.math.pow(f32, 2.0, (pitch - 69) / 12);
@@ -86,7 +95,7 @@ pub inline fn next(self: *FMBass, srate: f32) f32 {
     const amp = self.amp_env.next(&amp_env_params, state.gate, srate);
 
     const falloff = (1 - self.phase);
-    const nt_notrack = nt * (1 - clamp01((pitch - 24) / 96));
+    const nt_notrack = total_mod * (1 - clamp01((pitch - 24) / 96));
     const t: OscType = if (timbre > 0.5) .sqr else .saw;
     self.prev_res = 2 * res * falloff * falloff * falloff * @sin(self.res_phase * std.math.tau);
     self.prev = amp * clamp(pdparams(clamp01(nt_notrack), t).wave(self.phase + fb) + self.prev_res);
@@ -101,6 +110,10 @@ pub fn handleMidiEvent(self: *FMBass, event: midi.Event) void {
         .pitch_wheel => |m| self.bend = 2 * (@as(f32, @floatFromInt(m.value)) - 8192) / 8192,
         else => {},
     }
+}
+
+pub fn mod_env_params(accentness: f32, user_params: DrumEnv.Params) DrumEnv.Params {
+    return .{ .time = lerp(user_params.time, 0.2, accentness), .shape = user_params.shape };
 }
 
 fn lerp(a: f32, b: f32, m: f32) f32 {
