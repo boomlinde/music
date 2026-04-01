@@ -53,6 +53,15 @@ pub const In = struct {
 };
 
 pub const Event = union(enum) {
+    pub fn setChannel(self: *Event, ch: u4) void {
+        switch (self.*) {
+            inline else => |*v| {
+                if (@typeInfo(@TypeOf(v.*)) != .@"struct") return;
+                if (@hasField(@TypeOf(v.*), "channel")) v.channel = ch;
+            },
+        }
+    }
+
     pub fn channel(self: Event) ?u4 {
         switch (self) {
             inline else => |v| {

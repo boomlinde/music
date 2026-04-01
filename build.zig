@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     addExe(b, "karplus", "src/main_karplus.zig", target, optimize, &.{"jack"});
     addExe(b, "smfplay", "src/main_smfplay.zig", target, optimize, &.{"jack"});
     addExe(b, "midivis", "src/main_midivis.zig", target, optimize, &.{ "jack", "sdl2" });
+    addExe(b, "midisplit", "src/main_midisplit.zig", target, optimize, &.{"jack"});
 }
 
 fn addExe(

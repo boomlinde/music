@@ -61,3 +61,12 @@ Simply generate a steady stream of MIDI active sensing messages.
 
 Visualizes all the incoming MIDI notes on one keyboard display for each
 channel.
+
+## midisplit
+
+Split incoming MIDI notes on one channel to two channels.
+
+    usage: midisplit <left channel 1-16> <right chennel 1-16>
+
+After launching the program, hit the key where you want the split to occur, on
+the channel you would like to intercept.
