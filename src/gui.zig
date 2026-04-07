@@ -432,11 +432,14 @@ pub const Value = struct {
     }
 
     pub fn int(comptime T: type, vp: *T) Value {
-        const max_int = std.math.maxInt(T);
+        return intMax(T, vp, null);
+    }
+    pub fn intMax(comptime T: type, vp: *T, comptime max: ?comptime_int) Value {
+        const max_int = max orelse std.math.maxInt(T);
         const wrap = struct {
             fn setter(value: f32, arg: *anyopaque) void {
                 const ip: *T = @ptrCast(@alignCast(arg));
-                const integer: T = @intFromFloat(@floor(value * max_int));
+                const integer: T = @intFromFloat(@round(value * max_int));
                 @atomicStore(T, ip, integer, .seq_cst);
             }
 

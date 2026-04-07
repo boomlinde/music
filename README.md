@@ -22,9 +22,9 @@ Karplus-Strong feeback delay synthesizer
 No-nonense JACK wrapper for munt mt32emu. Currently expects ctrl\_mt32.rom
 and pcm\_mt32.rom in cwd.
 
-## pdbass
+## digibass
 
-Phase distortion monosynth
+Phase distortion/FM monosynth
 
 # Tools
 

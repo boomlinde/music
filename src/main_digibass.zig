@@ -3,7 +3,7 @@ const gui = @import("gui.zig");
 const midi = @import("midi.zig");
 
 const JackState = @import("JackState.zig");
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 
 const RGB = gui.RGB;
 const Slot = gui.Slot;
@@ -14,12 +14,12 @@ var midiport: *JackState.Port = undefined;
 var audioport: *JackState.Port = undefined;
 var in = midi.In{};
 
-var params = PDBass.Params{};
+var params = DigiBass.Params{};
 
-var synth: PDBass = .{ .channel = 0, .params = &params };
+var synth: DigiBass = .{ .channel = 0, .params = &params };
 
 pub fn main() !void {
-    const name = "pdbass";
+    const name = "digibass";
     var redraw = false;
 
     const bg = RGB.init(30, 30, 30);
@@ -48,12 +48,12 @@ pub fn main() !void {
             .{ .slider = .{ .value = Value.passthrough(&params.accentness) } },
         },
         .{
+            .{ .slider = .{ .value = Value.intMax(u8, @ptrCast(&params.sound_type), 1) } },
+            .empty,
+            .empty,
+            .empty,
+            .empty,
             .{ .slider = .{ .value = Value.int(u4, &synth.channel) } },
-            .empty,
-            .empty,
-            .empty,
-            .empty,
-            .empty,
         },
     };
     try gui.run(name, 800, 600, bg, fg, &redraw, layout);
