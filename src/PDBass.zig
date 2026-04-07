@@ -5,19 +5,19 @@ const MonoLegato = @import("MonoLegato.zig");
 const MonoVoiceManager = @import("MonoVoiceManager.zig");
 const PDBass = @This();
 const Smoother = @import("Smoother.zig");
-const Pd = @import("PdVoice.zig").Pd;
 const ADEnv = @import("ADEnv.zig");
 
 const Accessor = @import("Accessor.zig").Accessor;
 
 pub const Params = struct {
-    res: f32 = 0,
-    timbre: f32 = 0.5,
-    feedback: f32 = 0,
+    timbre: f32 = 0.5 - 0.125,
     mod_depth: f32 = 0.5,
-    accentness: f32 = 0.5,
-    decay: f32 = 0.5,
-    channel: u4 = 0,
+
+    res: f32 = 1,
+    feedback: f32 = 0,
+
+    decay: f32 = 0.2,
+    accentness: f32 = 0.3,
 
     pub usingnamespace Accessor(@This());
 };
@@ -25,24 +25,37 @@ pub const Params = struct {
 const param_smooth_time = 0.1;
 const bend_smooth_time = 0.01;
 
+channel: u4,
+params: *const Params,
+
 bend: f32 = 0,
 phase: f32 = 0,
+prev_phase: f32 = 0,
 res_phase: f32 = 0,
+res2_phase: f32 = 0,
 legato: MonoLegato = .{ .time = 0.06 },
 man: MonoVoiceManager = .{},
-params: Params = .{},
 amp_env: ADREnv = .{},
 prev: f32 = 0,
 prev_res: f32 = 0,
 mod_env: ADEnv = .{},
 prev_gate: bool = false,
 
-accentness_smooth: Smoother = .{},
 bend_smooth: Smoother = .{},
+
+accentness_smooth: Smoother = .{},
 res_smooth: Smoother = .{},
 timbre_smooth: Smoother = .{},
 feedback_smooth: Smoother = .{},
 mod_smooth: Smoother = .{},
+
+pub fn short(self: *PDBass) void {
+    self.accentness_smooth.short(self.params.get(.accentness));
+    self.timbre_smooth.short(self.params.get(.timbre));
+    self.res_smooth.short(self.params.get(.res));
+    self.mod_smooth.short(self.params.get(.mod_depth));
+    self.feedback_smooth.short(self.params.get(.feedback));
+}
 
 pub inline fn next(self: *PDBass, srate: f32) f32 {
     const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
@@ -52,6 +65,12 @@ pub inline fn next(self: *PDBass, srate: f32) f32 {
     const mod = self.mod_smooth.next(self.params.get(.mod_depth), param_smooth_time, srate);
     const feedback = self.feedback_smooth.next(self.params.get(.feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
+
+    const res2_amp = r2a: {
+        const flat_timbre = @max(0, timbre * 2 - 1);
+        const ix = (1 - flat_timbre * 16);
+        break :r2a @min(1, 1 - ix * ix * ix);
+    };
 
     if (self.man.state.gate and !self.prev_gate) {
         self.mod_env.trigger();
@@ -86,14 +105,16 @@ pub inline fn next(self: *PDBass, srate: f32) f32 {
 
     const res_freq = 440.0 * std.math.pow(f32, 2.0, (total_mod * 96 + 32 - 69) / 12);
     defer self.res_phase = @mod(self.res_phase + res_freq / srate, 1);
+    defer self.res2_phase = @mod(self.res2_phase + res_freq / srate, 1);
 
     const freq = 440.0 * std.math.pow(f32, 2.0, (pitch - 69) / 12);
     defer {
-        self.phase = self.phase + freq / srate;
-        if (self.phase >= 1) {
-            self.phase = @mod(self.phase, 1);
-            self.res_phase = 0;
-        }
+        const new_phase = @mod(self.phase + freq / srate, 1);
+
+        if (new_phase < self.phase) self.res_phase = 0;
+        if (@mod(new_phase * 2, 1) < @mod(self.phase * 2, 1)) self.res2_phase = 0;
+
+        self.phase = new_phase;
     }
 
     const amp_env_params: ADREnv.Params = .{
@@ -104,16 +125,23 @@ pub inline fn next(self: *PDBass, srate: f32) f32 {
 
     const amp = self.amp_env.next(&amp_env_params, state.gate, srate);
 
-    const falloff = (1 - self.phase);
+    const falloff = falloffFunc(self.phase, res);
+    const falloff2 = falloffFunc(@mod(self.phase + 0.5, 1), res);
     const nt_notrack = total_mod * (1 - clamp01((pitch - 24) / 96));
     const t: OscType = if (timbre > 0.5) .sqr else .saw;
     self.prev_res = 2 * res * falloff * falloff * falloff * @sin(self.res_phase * std.math.tau);
-    self.prev = amp * clamp(pdparams(clamp01(nt_notrack), t).wave(self.phase + fb) + self.prev_res);
+    self.prev_res += res2_amp * (-2 * res * falloff2 * falloff2 * falloff2 * @sin(self.res2_phase * std.math.tau));
+    self.prev = clamp((pdparams(clamp01(nt_notrack), t).wave(self.phase + fb) * 1 + self.prev_res)) * amp;
     return self.prev;
 }
 
+pub inline fn falloffFunc(phase: f32, factor: f32) f32 {
+    return @max(0, 1 - phase / @max(0.01, factor));
+    // return 1 - phase;
+}
+
 pub fn handleMidiEvent(self: *PDBass, event: midi.Event) void {
-    if ((event.channel() orelse return) != self.params.get(.channel)) return;
+    if ((event.channel() orelse return) != self.channel) return;
     switch (event) {
         .note_on => |e| self.man.noteOn(e.pitch, e.velocity),
         .note_off => |e| self.man.noteOff(e.pitch),
@@ -180,3 +208,29 @@ inline fn logize3(a: f32) f32 {
     const m = 1 - a;
     return 1 - m * m * m;
 }
+
+pub const Pd = struct {
+    x: f32 = 0.5,
+    y: f32 = 0.5,
+    n: f32 = 0,
+    p: f32 = 0,
+    q: f32 = 1,
+
+    pub fn wave(self: Pd, ph: f32) f32 {
+        const ph_mod = @mod(ph, 1);
+        return @sin((self.p * 0.25 + self.phase(ph_mod)) * std.math.tau * self.q);
+    }
+
+    inline fn phase(self: Pd, ph: f32) f32 {
+        const n = self.n + 1;
+        return @mod(self.singlePhase(ph * n) / n, n);
+    }
+
+    inline fn singlePhase(self: Pd, ph: f32) f32 {
+        const mp = @mod(ph, 1);
+        return @floor(ph) + if (mp < self.x)
+            mp * (self.y / self.x)
+        else
+            (mp - self.x) * ((1 - self.y) / (1 - self.x)) + self.y;
+    }
+};

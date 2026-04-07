@@ -16,7 +16,7 @@ var in = midi.In{};
 
 var params = PDBass.Params{};
 
-var synth: PDBass = .{};
+var synth: PDBass = .{ .channel = 0, .params = &params };
 
 pub fn main() !void {
     const name = "pdbass";
@@ -40,15 +40,15 @@ pub fn main() !void {
 
     const layout = [2][6]Slot{
         .{
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.res) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.timbre) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.feedback) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.decay) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.mod_depth) } },
-            .{ .slider = .{ .value = Value.passthrough(&synth.params.accentness) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.res) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.timbre) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.feedback) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.decay) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.mod_depth) } },
+            .{ .slider = .{ .value = Value.passthrough(&params.accentness) } },
         },
         .{
-            .{ .slider = .{ .value = Value.int(u4, &synth.params.channel) } },
+            .{ .slider = .{ .value = Value.int(u4, &synth.channel) } },
             .empty,
             .empty,
             .empty,
